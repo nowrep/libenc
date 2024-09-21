@@ -1,6 +1,7 @@
 #include "encoder.h"
 #include "surface.h"
 
+#include <string.h>
 #include <iostream>
 
 enc_encoder::enc_encoder()
@@ -76,14 +77,21 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
 
    codedbuf_size = aligned_width * aligned_height * 3 + (1 << 16);
 
+   update_frame_rate(params->frame_rate.num, params->frame_rate.den);
+   if (params->rc_params)
+      update_rate_control(params->rc_params);
+
    return true;
 }
 
-std::unique_ptr<enc_task> enc_encoder::begin_encode(struct enc_surface *surface)
+std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_params *params)
 {
-   VAStatus status = vaBeginPicture(dpy, context_id, surface->surface_id);
+   VAStatus status = vaBeginPicture(dpy, context_id, params->surface->surface_id);
    if (!va_check(status, "vaBeginPicture"))
       return {};
+
+   if (params->rc_params)
+      update_rate_control(params->rc_params);
 
    return std::make_unique<enc_task>(this, frame_id);
 }
@@ -109,6 +117,26 @@ void enc_encoder::add_buffer(VABufferType type, uint32_t size, const void *data)
    VAStatus status = vaCreateBuffer(dpy, context_id, type, size, 1, const_cast<void *>(data), &buf_id);
    if (!va_check(status, "vaCreateBuffer"))
       return;
+   pic_buffers.push_back(buf_id);
+}
+
+void enc_encoder::add_misc_buffer(VAEncMiscParameterType type, uint32_t size, const void *data)
+{
+   VABufferID buf_id;
+   size += sizeof(VAEncMiscParameterBuffer);
+   VAStatus status = vaCreateBuffer(dpy, context_id, VAEncMiscParameterBufferType, size, 1, nullptr, &buf_id);
+   if (!va_check(status, "vaCreateBuffer"))
+      return;
+
+   VAEncMiscParameterBuffer *param;
+   status = vaMapBuffer2(dpy, buf_id, reinterpret_cast<void**>(&param), VA_MAPBUFFER_FLAG_WRITE);
+   if (!va_check(status, "vaMapBuffer2"))
+      return;
+
+   param->type = type;
+   memcpy(param->data, data, size);
+   vaUnmapBuffer(dpy, buf_id);
+
    pic_buffers.push_back(buf_id);
 }
 
@@ -145,5 +173,35 @@ void enc_encoder::release_buffer(VABufferID buffer)
          b.first = true;
          break;
       }
+   }
+}
+
+void enc_encoder::update_frame_rate(uint32_t num, uint32_t den)
+{
+   VAEncMiscParameterFrameRate fr = {};
+   fr.framerate = num | (den << 16);
+   add_misc_buffer(VAEncMiscParameterTypeFrameRate, sizeof(fr), &fr);
+}
+
+void enc_encoder::update_rate_control(const struct enc_rate_control_params *params)
+{
+   VAEncMiscParameterRateControl rc = {};
+   rc.bits_per_second = std::max(params->bit_rate, params->peak_bit_rate);
+   rc.target_percentage = (rc.bits_per_second * 100) / params->bit_rate;
+   rc.min_qp = params->min_qp;
+   rc.max_qp = params->max_qp;
+   rc.quality_factor = params->qvbr_quality;
+   rc.rc_flags.bits.disable_bit_stuffing = params->disable_filler_data;
+   add_misc_buffer(VAEncMiscParameterTypeRateControl, sizeof(rc), &rc);
+
+   VAEncMiscParameterHRD hrd = {};
+   hrd.buffer_size = params->vbv_buffer_size;
+   hrd.initial_buffer_fullness = params->vbv_initial_fullness;
+   add_misc_buffer(VAEncMiscParameterTypeHRD, sizeof(hrd), &hrd);
+
+   if (params->max_frame_size) {
+      VAEncMiscParameterBufferMaxFrameSize size = {};
+      size.max_frame_size = params->max_frame_size;
+      add_misc_buffer(VAEncMiscParameterTypeMaxFrameSize, sizeof(size), &size);
    }
 }

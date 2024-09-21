@@ -78,6 +78,35 @@ void enc_surface_destroy(struct enc_surface *surface);
 // Exports surface to dmabuf. Fd is owned by caller.
 bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *dmabuf);
 
+struct enc_rate_control_params {
+   // Target bit rate.
+   uint32_t bit_rate;
+
+   // Peak bit rate (VBR and QVBR).
+   uint32_t peak_bit_rate;
+
+   // VBV buffer size (bits).
+   uint32_t vbv_buffer_size;
+
+   // VBV initial buffer fullness (bits).
+   uint32_t vbv_initial_fullness;
+
+   // Minimum QP.
+   uint8_t min_qp;
+
+   // Maximum QP.
+   uint8_t max_qp;
+
+   // QVBR quality
+   uint8_t qvbr_quality;
+
+   // Maximum frame size (bits).
+   uint32_t max_frame_size;
+
+   // Disable filler data.
+   bool disable_filler_data;
+};
+
 #include <enc/enc_h264.h>
 
 struct enc_encoder_params {
@@ -100,8 +129,17 @@ struct enc_encoder_params {
    // Interval between IDR frames. 0 = infinite.
    uint32_t gop_size;
 
+   // Frame rate.
+   struct {
+      uint32_t num;
+      uint32_t den;
+   } frame_rate;
+
    // Rate control mode.
    enum enc_rate_control_mode rc_mode;
+
+   // Rate control params.
+   struct enc_rate_control_params *rc_params;
 
    union {
       struct enc_h264_encoder_params h264;
@@ -118,9 +156,6 @@ struct enc_frame_params {
    // Frame type.
    enum enc_frame_type frame_type;
 
-   // Frame QP. Only valid with `ENC_RATE_CONTROL_MODE_CQP`.
-   uint16_t qp;
-
    // If set, use references with specified frame_id.
    uint8_t num_ref_list0;
    uint64_t ref_list0[ENC_MAX_REFERENCES];
@@ -131,6 +166,12 @@ struct enc_frame_params {
 
    // If set, this frame will not be used as reference.
    bool not_referenced;
+
+   // Frame QP. Only valid with `ENC_RATE_CONTROL_MODE_CQP`.
+   uint16_t qp;
+
+   // Rate control params.
+   struct enc_rate_control_params *rc_params;
 };
 
 struct enc_task *enc_encoder_encode_frame(struct enc_encoder *encoder, const struct enc_frame_params *params);

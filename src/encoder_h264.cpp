@@ -166,7 +166,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    dpb[recon_slot].frame_id = frame_id;
    dpb[recon_slot].pic_order_cnt = pic_order_cnt;
 
-   auto task = begin_encode(params->surface);
+   auto task = begin_encode(params);
    if (!task)
       return {};
 
