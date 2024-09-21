@@ -1,0 +1,6 @@
+option(
+  'test-app',
+  type : 'feature',
+  value : 'enabled',
+  description : 'Build test app, requires ffmpeg.',
+)

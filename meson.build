@@ -38,3 +38,7 @@ libenc_dep = declare_dependency(
   link_with: libenc,
   include_directories: inc_libenc,
 )
+
+if get_option('test-app').enabled()
+  subdir('app')
+endif
