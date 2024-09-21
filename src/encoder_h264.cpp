@@ -1,6 +1,9 @@
 #include "encoder_h264.h"
 #include "bitstream_h264.h"
 
+#include <string.h>
+#include <assert.h>
+
 encoder_h264::encoder_h264()
    : enc_encoder()
 {
@@ -105,9 +108,9 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    // Invalidate requested refs
    for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
       uint64_t invalidate_id = params->invalidate_refs[i];
-      for (uint32_t j = 0; j < dpb.size(); j++) {
-         if (dpb[j].frame_id == invalidate_id) {
-            dpb[j].valid = false;
+      for (auto &d : dpb) {
+         if (d.frame_id == invalidate_id) {
+            d.valid = false;
             break;
          }
       }
@@ -151,18 +154,10 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       }
    }
 
-   // Otherwise replace oldest slot
-   if (recon_slot == 0xff) {
-      uint64_t lowest_id = UINT64_MAX;
-      for (uint32_t i = 0; i < dpb.size(); i++) {
-         if (dpb[i].frame_id < lowest_id) {
-            lowest_id = dpb[i].frame_id;
-            recon_slot = i;
-         }
-      }
-   }
+   bool not_referenced = num_refs == 0 || (frame_type == ENC_FRAME_TYPE_P && params->not_referenced);
 
-   dpb[recon_slot].valid = !params->not_referenced;
+   assert(recon_slot != 0xff);
+   dpb[recon_slot].valid = !not_referenced;
    dpb[recon_slot].frame_id = frame_id;
    dpb[recon_slot].pic_order_cnt = pic_order_cnt;
 
@@ -212,7 +207,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       slice.idr_pic_id = idr_pic_id++;
    } else {
       slice.nal_unit_type = 1;
-      slice.nal_ref_idc = params->not_referenced ? 0 : 1;
+      slice.nal_ref_idc = not_referenced ? 0 : 1;
       if (frame_type == ENC_FRAME_TYPE_I)
          slice.slice_type = 2;
       else if (frame_type == ENC_FRAME_TYPE_P)
@@ -300,7 +295,44 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    if (!end_encode())
       return {};
 
-   if (!params->not_referenced)
+   // Invalidate oldest reference
+   if (num_refs > 0) {
+      uint8_t used_refs = 0;
+      for (auto &d : dpb) {
+         if (d.valid)
+            used_refs++;
+      }
+
+      if (used_refs > num_refs) {
+         uint8_t slot = 0xff;
+         uint64_t lowest_id = UINT64_MAX;
+         for (uint32_t i = 0; i < dpb.size(); i++) {
+            if (i != recon_slot && dpb[i].valid && dpb[i].frame_id < lowest_id) {
+               lowest_id = dpb[i].frame_id;
+               slot = i;
+            }
+         }
+         assert(slot != 0xff);
+         dpb[slot].valid = false;
+      }
+   }
+
+   if (params->feedback) {
+      memset(params->feedback, 0, sizeof(*params->feedback));
+      params->feedback->frame_type = frame_type;
+      params->feedback->frame_id = frame_id;
+      if (ref_l0 != 0xff) {
+         params->feedback->num_ref_list0 = 1;
+         params->feedback->ref_list0[0] = ref_l0;
+      }
+      for (auto &d : dpb) {
+         if (!d.valid)
+            continue;
+         params->feedback->ref[params->feedback->num_refs++] = d.frame_id;
+      }
+   }
+
+   if (!not_referenced)
       frame_id++;
 
    pic_order_cnt = (pic_order_cnt + 2) % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));

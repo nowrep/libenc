@@ -41,5 +41,4 @@ struct enc_encoder
    std::vector<std::pair<bool, VABufferID>> buffer_pool;
 
    uint32_t num_refs = 0;
-   uint64_t frame_id = 0;
 };

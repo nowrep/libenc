@@ -93,7 +93,7 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    if (params->rc_params)
       update_rate_control(params->rc_params);
 
-   return std::make_unique<enc_task>(this, frame_id);
+   return std::make_unique<enc_task>(this);
 }
 
 bool enc_encoder::end_encode()

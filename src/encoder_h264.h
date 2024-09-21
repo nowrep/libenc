@@ -26,6 +26,7 @@ private:
    };
    std::vector<dpb_entry> dpb;
 
+   uint64_t frame_id = 0;
    uint32_t gop_size = 0;
    uint64_t gop_count = 0;
    uint32_t pic_order_cnt = 0;

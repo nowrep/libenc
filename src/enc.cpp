@@ -75,11 +75,6 @@ void enc_task_destroy(struct enc_task *task)
    delete task;
 }
 
-uint64_t enc_task_frame_id(struct enc_task *task)
-{
-   return task->frame_id;
-}
-
 bool enc_task_wait(struct enc_task *task, uint64_t timeout_ns)
 {
    return task->wait(timeout_ns);

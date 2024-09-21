@@ -1,8 +1,7 @@
 #include "task.h"
 
-enc_task::enc_task(enc_encoder *encoder, uint64_t frame_id)
+enc_task::enc_task(enc_encoder *encoder)
    : encoder(encoder)
-   , frame_id(frame_id)
 {
    buffer_id = encoder->acquire_buffer();
 }

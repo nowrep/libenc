@@ -59,7 +59,7 @@ struct enc_dmabuf {
 
 struct enc_surface_params {
    // Device.
-   struct enc_dev *dev;
+   const struct enc_dev *dev;
 
    // Surface format.
    enum enc_format format;
@@ -69,7 +69,7 @@ struct enc_surface_params {
    uint32_t height;
 
    // Import dmabuf. Fd is owned by caller.
-   struct enc_dmabuf *dmabuf;
+   const struct enc_dmabuf *dmabuf;
 };
 
 struct enc_surface *enc_surface_create(const struct enc_surface_params *params);
@@ -111,7 +111,7 @@ struct enc_rate_control_params {
 
 struct enc_encoder_params {
    // Device.
-   struct enc_dev *dev;
+   const struct enc_dev *dev;
 
    // Codec.
    enum enc_codec codec;
@@ -139,7 +139,7 @@ struct enc_encoder_params {
    enum enc_rate_control_mode rc_mode;
 
    // Rate control params.
-   struct enc_rate_control_params *rc_params;
+   const struct enc_rate_control_params *rc_params;
 
    union {
       struct enc_h264_encoder_params h264;
@@ -149,18 +149,34 @@ struct enc_encoder_params {
 struct enc_encoder *enc_encoder_create(const struct enc_encoder_params *params);
 void enc_encoder_destroy(struct enc_encoder *encoder);
 
+struct enc_frame_feedback {
+   // Frame type.
+   enum enc_frame_type frame_type;
+
+   // Frame id.
+   uint64_t frame_id;
+
+   // Frame ids of references used to encode this frame.
+   uint8_t num_ref_list0;
+   uint64_t ref_list0[ENC_MAX_REFERENCES];
+
+   // Frame ids of available references after encoding this frame.
+   uint8_t num_refs;
+   uint64_t ref[ENC_MAX_REFERENCES];
+};
+
 struct enc_frame_params {
    // Input surface.
-   struct enc_surface *surface;
+   const struct enc_surface *surface;
 
    // Frame type.
    enum enc_frame_type frame_type;
 
-   // If set, use references with specified frame_id.
+   // If set, use references with specified frame id.
    uint8_t num_ref_list0;
    uint64_t ref_list0[ENC_MAX_REFERENCES];
 
-   // If set, invalidates references with specified frame_id.
+   // If set, invalidates references with specified frame id.
    uint8_t num_invalidate_refs;
    uint64_t invalidate_refs[ENC_MAX_REFERENCES];
 
@@ -171,13 +187,15 @@ struct enc_frame_params {
    uint16_t qp;
 
    // Rate control params.
-   struct enc_rate_control_params *rc_params;
+   const struct enc_rate_control_params *rc_params;
+
+   // If set, encoder will output frame feedback info.
+   struct enc_frame_feedback *feedback;
 };
 
 struct enc_task *enc_encoder_encode_frame(struct enc_encoder *encoder, const struct enc_frame_params *params);
 
 void enc_task_destroy(struct enc_task *task);
-uint64_t enc_task_frame_id(struct enc_task *task);
 bool enc_task_wait(struct enc_task *task, uint64_t timeout_ns);
 // Should be called in a loop until it returns false.
 bool enc_task_get_bitstream(struct enc_task *task, uint32_t *size, uint8_t **data);
