@@ -141,7 +141,9 @@ static int help(void)
    printf("  --rc RATE_CONTROL                    Set rate control mode (cqp, cbr, vbr, qvbr), default = cqp\n");
    printf("  --bitrate BITRATE_KBPS               Set bit rate in kbps, default = 10000\n");
    printf("  --qp QP                              Set QP, default = 22\n");
-   printf("  --intra-refresh                      Enable intra refresh\n");
+   printf("  --intra-refresh                      Enable intra refresh, default = false\n");
+   printf("  --rc-layers NUM_LAYERS               Set number of rate control layers, default = 1\n");
+   printf("  --hierarchy LEVEL                    Set reference hierarchy level, default = 1\n");
    printf("\n");
    printf("  --maxframes NUM_FRAMES               Set maximum number of encoded frames\n");
    printf("  --norefs FRAMES                      List of comma separated frames to not be referenced\n");
@@ -164,6 +166,8 @@ static struct option long_options[] = {
    {"dropframes",       required_argument, NULL, ':'},
    {"intra-refresh",    no_argument,       NULL, ':'},
    {"no-invalidate",    no_argument,       NULL, ':'},
+   {"rc-layers",        required_argument, NULL, ':'},
+   {"hierarchy",        required_argument, NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -180,6 +184,8 @@ char *opt_norefs = NULL;
 char *opt_dropframes = NULL;
 bool opt_intra_refresh = false;
 bool opt_invalidate = true;
+uint32_t opt_rc_layers = 1;
+uint8_t opt_hierarchy = 1;
 
 int next_noref(void)
 {
@@ -200,6 +206,15 @@ int next_dropframe(void)
 }
 
 struct enc_rate_control_params rc_params[4];
+
+uint8_t hierarchy_levels[][10] = {
+   // 2 levels
+   { 0, 1, 0xff },
+   // 3 levels
+   { 0, 2, 1, 2, 0xff },
+   // 4 levels
+   { 0, 3, 2, 3, 1, 3, 2, 3, 0xff },
+};
 
 int main(int argc, char *argv[])
 {
@@ -266,6 +281,14 @@ int main(int argc, char *argv[])
       case 12:
          opt_invalidate = false;
          break;
+      case 13:
+         opt_rc_layers = atoi(optarg);
+         if (opt_rc_layers > 4)
+            opt_rc_layers = 4;
+         break;
+      case 14:
+         opt_hierarchy = atoi(optarg);
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -298,13 +321,15 @@ int main(int argc, char *argv[])
       return 2;
    }
 
-   rc_params[0].frame_rate = opt_fps;
-   rc_params[0].bit_rate = opt_bitrate * 1000;
-   rc_params[0].peak_bit_rate = opt_bitrate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1000.0 : 1500.0);
-   rc_params[0].vbv_buffer_size = opt_bitrate * 1000;
-   rc_params[0].vbv_initial_fullness = opt_bitrate * 1000;
-   rc_params[0].min_qp = 1;
-   rc_params[0].max_qp = 51;
+   for (uint32_t i = 0; i < opt_rc_layers; i++) {
+      rc_params[i].frame_rate = opt_fps / (1 << i);
+      rc_params[i].bit_rate = opt_bitrate / (1 << i) * 1000;
+      rc_params[i].peak_bit_rate = opt_bitrate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1000.0 : 1500.0);
+      rc_params[i].vbv_buffer_size = opt_bitrate * 1000;
+      rc_params[i].vbv_initial_fullness = opt_bitrate * 1000;
+      rc_params[i].min_qp = 1;
+      rc_params[i].max_qp = 51;
+   }
 
    struct enc_encoder_params encoder_params = {
       .dev = dev,
@@ -315,7 +340,7 @@ int main(int argc, char *argv[])
       .num_refs = opt_refs,
       .gop_size = opt_gop,
       .rc_mode = opt_rc,
-      .num_rc_layers = 1,
+      .num_rc_layers = opt_rc_layers,
       .rc_params = rc_params,
       .intra_refresh = opt_intra_refresh,
       .h264 = {
@@ -336,9 +361,13 @@ int main(int argc, char *argv[])
       fout = fopen(output, "w");
    }
 
+   uint64_t ref_num = 0;
    uint64_t frame_num = 0;
    uint64_t noref_frame = next_noref();
    uint64_t drop_frame = next_dropframe();
+   uint8_t hierarchy_level = 0;
+   uint8_t hierarchy_idx = 0;
+   uint64_t hierarchy_frames[4] = {0, 0, 0, 0};
 
    struct enc_frame_feedback feedback;
    struct enc_frame_params frame_params = {
@@ -362,6 +391,37 @@ int main(int argc, char *argv[])
 
       frame_params.surface = surf;
       frame_params.not_referenced = false;
+      frame_params.num_ref_list0 = 0;
+
+      if (opt_hierarchy > 1) {
+         hierarchy_level = hierarchy_levels[opt_hierarchy - 2][hierarchy_idx++];
+         if (hierarchy_level == 0xff) {
+            hierarchy_level = 0;
+            hierarchy_idx = 1;
+            for (uint32_t i = 1; i < 4; i++)
+               hierarchy_frames[i] = hierarchy_frames[0];
+         }
+         if (hierarchy_level == opt_hierarchy - 1)
+            frame_params.not_referenced = true;
+         if (hierarchy_level == 0) {
+            if (hierarchy_frames[0] != UINT64_MAX) {
+               frame_params.num_ref_list0 = 1;
+               frame_params.ref_list0[0] = hierarchy_frames[0];
+            }
+         } else {
+            uint64_t max_id = 0;
+            for (uint8_t i = 0; i < hierarchy_level; i++) {
+               if (hierarchy_frames[i] != UINT64_MAX && hierarchy_frames[i] >= max_id) {
+                  max_id = hierarchy_frames[i];
+                  frame_params.num_ref_list0 = 1;
+                  frame_params.ref_list0[0] = max_id;
+               }
+            }
+         }
+         frame_params.temporal_id = hierarchy_level % encoder_params.num_rc_layers;
+      } else if (encoder_params.num_rc_layers > 1) {
+         frame_params.temporal_id = (frame_params.temporal_id + 1) % encoder_params.num_rc_layers;
+      }
 
       if (noref_frame > 0 && noref_frame == frame_num) {
          noref_frame = next_noref();
@@ -371,7 +431,10 @@ int main(int argc, char *argv[])
       struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
       assert(enc_task_wait(task, UINT64_MAX));
 
-      if (drop_frame > 0 && drop_frame == frame_num) {
+      if (feedback.reference)
+         ref_num++;
+
+      if (drop_frame > 0 && drop_frame == ref_num) {
          drop_frame = next_dropframe();
          if (opt_invalidate)
             frame_params.invalidate_refs[frame_params.num_invalidate_refs++] = feedback.frame_id;
@@ -386,8 +449,18 @@ int main(int argc, char *argv[])
       enc_task_destroy(task);
       enc_surface_destroy(surf);
 
+      if (opt_hierarchy > 1) {
+         if (feedback.frame_type == ENC_FRAME_TYPE_IDR) {
+            hierarchy_idx = 1;
+            for (uint32_t i = 0; i < 4; i++)
+               hierarchy_frames[i] = feedback.frame_id;
+         } else if (feedback.reference) {
+            hierarchy_frames[hierarchy_level] = feedback.frame_id;
+         }
+      }
+
       if (!quiet) {
-         fprintf(stderr, "\r Frame = %"PRIu64" ...", frame_num);
+         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u ...", frame_num, feedback.frame_id, feedback.reference, hierarchy_level);
          fflush(stderr);
       }
 

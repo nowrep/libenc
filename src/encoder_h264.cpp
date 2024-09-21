@@ -161,6 +161,15 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
 
    bitstream_h264 bs;
 
+   if (num_layers > 1) {
+      bitstream_h264::prefix pfx;
+      pfx.svc_extension_flag = 1;
+      pfx.temporal_id = frame_type == ENC_FRAME_TYPE_IDR ? 0 : params->temporal_id;
+      bs.write_prefix(pfx);
+      add_packed_header(VAEncPackedHeaderRawData, bs);
+      bs.reset();
+   }
+
    if (frame_type == ENC_FRAME_TYPE_IDR || (intra_refresh && gop_count == 0)) {
       VAEncSequenceParameterBufferH264 seq = {};
       seq.seq_parameter_set_id = sps.seq_parameter_set_id;
@@ -189,6 +198,14 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
          bitstream_h264::sei_recovery_point srp = {};
          srp.exact_match_flag = 1;
          bs.write_sei_recovery_point(srp);
+         add_packed_header(VAEncPackedHeaderRawData, bs);
+         bs.reset();
+      }
+
+      if (num_layers > 1) {
+         bitstream_h264::sei_scalability_info ssi = {};
+         ssi.num_layers_minus1 = num_layers - 1;
+         bs.write_sei_scalability_info(ssi);
          add_packed_header(VAEncPackedHeaderRawData, bs);
          bs.reset();
       }
@@ -231,8 +248,10 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       slice.adaptive_ref_pic_marking_mode_flag = 1;
       slice.num_mmco_op = params->num_invalidate_refs;
       for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
-         slice.mmco_op[i].memory_management_control_operation = 1;
-         slice.mmco_op[i].difference_of_pic_nums_minus1 = frame_id - params->invalidate_refs[i] - 1;
+         if (frame_id > params->invalidate_refs[i]) {
+            slice.mmco_op[i].memory_management_control_operation = 1;
+            slice.mmco_op[i].difference_of_pic_nums_minus1 = frame_id - params->invalidate_refs[i] - 1;
+         }
       }
    }
 
@@ -332,6 +351,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       memset(params->feedback, 0, sizeof(*params->feedback));
       params->feedback->frame_type = frame_type;
       params->feedback->frame_id = frame_id;
+      params->feedback->reference = !not_referenced;
       if (ref_l0 != 0xff) {
          params->feedback->num_ref_list0 = 1;
          params->feedback->ref_list0[0] = ref_l0;

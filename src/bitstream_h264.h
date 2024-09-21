@@ -95,6 +95,19 @@ public:
       int8_t slice_beta_offset_div2;
    };
 
+   struct prefix {
+      uint8_t svc_extension_flag : 1;
+      uint8_t idr_flag : 1;
+      uint8_t priority_id;
+      uint8_t no_inter_layer_pred_flag : 1;
+      uint8_t dependency_id;
+      uint8_t quality_id;
+      uint8_t temporal_id;
+      uint8_t use_ref_base_pic_flag : 1;
+      uint8_t discardable_flag : 1;
+      uint8_t output_flag : 1;
+   };
+
    struct sei_recovery_point {
       uint16_t recovery_frame_cnt;
       uint8_t exact_match_flag;
@@ -102,13 +115,20 @@ public:
       uint8_t changing_slice_group_idc;
    };
 
+   struct sei_scalability_info {
+      uint32_t num_layers_minus1;
+   };
+
    bitstream_h264();
 
    void write_sps(const sps &sps);
    void write_pps(const pps &pps);
    void write_slice(const slice &slice, const sps &sps, const pps &pps);
+   void write_prefix(const prefix &pfx);
    void write_sei_recovery_point(const sei_recovery_point &srp);
+   void write_sei_scalability_info(const sei_scalability_info &ssi);
 
 private:
    void write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type);
+   void write_sei(uint32_t type, const bitstream &bs);
 };

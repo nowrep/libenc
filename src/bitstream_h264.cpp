@@ -171,6 +171,25 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
    trailing_bits();
 }
 
+void bitstream_h264::write_prefix(const prefix &pfx)
+{
+   write_nal_header(0, 14);
+
+   ui(pfx.svc_extension_flag, 1);
+   if (pfx.svc_extension_flag) {
+      ui(pfx.idr_flag, 1);
+      ui(pfx.priority_id, 6);
+      ui(pfx.no_inter_layer_pred_flag, 1);
+      ui(pfx.dependency_id, 3);
+      ui(pfx.quality_id, 4);
+      ui(pfx.temporal_id, 3);
+      ui(pfx.use_ref_base_pic_flag, 1);
+      ui(pfx.discardable_flag, 1);
+      ui(pfx.output_flag, 1);
+      ui(0x3, 2); // reserved_three_2bits
+   }
+}
+
 void bitstream_h264::write_sei_recovery_point(const sei_recovery_point &srp)
 {
    write_nal_header(0, 6);
@@ -180,13 +199,46 @@ void bitstream_h264::write_sei_recovery_point(const sei_recovery_point &srp)
    bs.ui(srp.exact_match_flag, 1);
    bs.ui(srp.broken_link_flag, 1);
    bs.ui(srp.changing_slice_group_idc, 2);
-   bs.trailing_bits();
+   bs.byte_align();
 
-   ui(6, 8); // last_payload_type_byte
-   ui(bs.size(), 8); // last_payload_size_byte
+   write_sei(6, bs);
+}
 
-   for (uint32_t i = 0; i < bs.size(); i++)
-      ui(bs.data()[i], 8);
+void bitstream_h264::write_sei_scalability_info(const sei_scalability_info &ssi)
+{
+   write_nal_header(0, 6);
+
+   bitstream bs;
+   bs.ui(0x0, 1); // temporal_id_nesting_flag
+   bs.ui(0x0, 1); // priority_layer_info_present_flag
+   bs.ui(0x0, 1); // priority_id_setting_flag
+   bs.ue(ssi.num_layers_minus1);
+   for (uint32_t i = 0; i <= ssi.num_layers_minus1; i++) {
+      bs.ue(i); // layer_id[i]
+      bs.ui(0x0, 6); // priority_id[i]
+      bs.ui(0x0, 1); // discardable_flag[i]
+      bs.ui(0x0, 3); // dependency_id[i]
+      bs.ui(0x0, 4); // quality_id[i]
+      bs.ui(i, 3); // temporal_id[i]
+      bs.ui(0x0, 1); // sub_pic_layer_flag[i]
+      bs.ui(0x0, 1); // sub_region_layer_flag[i]
+      bs.ui(0x0, 1); // iroi_division_info_present_flag[i]
+      bs.ui(0x0, 1); // profile_level_info_present_flag[i]
+      bs.ui(0x0, 1); // bitrate_info_present_flag[i]
+      bs.ui(0x0, 1); // frm_rate_info_present_flag[i]
+      bs.ui(0x0, 1); // frm_size_info_present_flag[i]
+      bs.ui(0x0, 1); // layer_dependency_info_present_flag[i]
+      bs.ui(0x0, 1); // parameter_sets_info_present_flag[i]
+      bs.ui(0x0, 1); // bitstream_restriction_info_present_flag[i]
+      bs.ui(0x0, 1); // exact_inter_layer_pred_flag[i]
+      bs.ui(0x0, 1); // layer_conversion_flag[i]
+      bs.ui(0x0, 1); // layer_output_flag[i]
+      bs.ue(0x0); // layer_dependency_info_src_layer_id_delta[i]
+      bs.ue(0x0); // parameter_sets_info_src_layer_id_delta[i]
+   }
+   bs.byte_align();
+
+   write_sei(24, bs);
 }
 
 void bitstream_h264::write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type)
@@ -195,4 +247,15 @@ void bitstream_h264::write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type
    ui(0x0, 1); // forbidden_zero_bit
    ui(nal_ref_idc, 2);
    ui(nal_unit_type, 5);
+}
+
+void bitstream_h264::write_sei(uint32_t type, const bitstream &bs)
+{
+   ui(type, 8); // last_payload_type_byte
+   ui(bs.size(), 8); // last_payload_size_byte
+
+   for (uint32_t i = 0; i < bs.size(); i++)
+      ui(bs.data()[i], 8);
+
+   trailing_bits();
 }

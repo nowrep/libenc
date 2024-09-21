@@ -10,6 +10,8 @@ enc_encoder::enc_encoder()
 
 enc_encoder::~enc_encoder()
 {
+   for (auto &b : buffer_pool)
+      vaDestroyBuffer(dpy, b.second);
    if (!dpb_surfaces.empty())
       vaDestroySurfaces(dpy, dpb_surfaces.data(), dpb_surfaces.size());
    if (context_id != VA_INVALID_ID)
@@ -137,8 +139,7 @@ void enc_encoder::add_buffer(VABufferType type, uint32_t size, const void *data)
 void enc_encoder::add_misc_buffer(VAEncMiscParameterType type, uint32_t size, const void *data)
 {
    VABufferID buf_id;
-   size += sizeof(VAEncMiscParameterBuffer);
-   VAStatus status = vaCreateBuffer(dpy, context_id, VAEncMiscParameterBufferType, size, 1, nullptr, &buf_id);
+   VAStatus status = vaCreateBuffer(dpy, context_id, VAEncMiscParameterBufferType, size + sizeof(VAEncMiscParameterBuffer), 1, nullptr, &buf_id);
    if (!va_check(status, "vaCreateBuffer"))
       return;
 
@@ -192,6 +193,12 @@ void enc_encoder::release_buffer(VABufferID buffer)
 
 void enc_encoder::update_rate_control(const struct enc_rate_control_params *params)
 {
+   if (num_layers > 1) {
+      VAEncMiscParameterTemporalLayerStructure layer = {};
+      layer.number_of_layers = num_layers;
+      add_misc_buffer(VAEncMiscParameterTypeTemporalLayerStructure, sizeof(layer), &layer);
+   }
+
    for (uint32_t i = 0; i < num_layers; i++) {
       uint32_t num = params[i].frame_rate;
       uint32_t den = 1;

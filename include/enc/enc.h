@@ -158,6 +158,9 @@ struct enc_frame_feedback {
    // Frame id.
    uint64_t frame_id;
 
+   // Frame is reference.
+   bool reference;
+
    // Frame ids of references used to encode this frame.
    uint8_t num_ref_list0;
    uint64_t ref_list0[ENC_MAX_REFERENCES];
@@ -187,6 +190,9 @@ struct enc_frame_params {
 
    // Frame QP. Only valid with `ENC_RATE_CONTROL_MODE_CQP`.
    uint16_t qp;
+
+   // Temporal id. Only valid when `num_rc_layers` > 1.
+   uint8_t temporal_id;
 
    // Rate control params (one for each layer).
    const struct enc_rate_control_params *rc_params;
