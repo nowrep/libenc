@@ -78,6 +78,9 @@ void enc_surface_destroy(struct enc_surface *surface);
 bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *dmabuf);
 
 struct enc_rate_control_params {
+   // Frame rate.
+   float frame_rate;
+
    // Target bit rate.
    uint32_t bit_rate;
 
@@ -128,16 +131,13 @@ struct enc_encoder_params {
    // Interval between IDR frames. 0 = infinite.
    uint32_t gop_size;
 
-   // Frame rate.
-   struct {
-      uint32_t num;
-      uint32_t den;
-   } frame_rate;
-
    // Rate control mode.
    enum enc_rate_control_mode rc_mode;
 
-   // Rate control params.
+   // Number of rate control layers.
+   uint8_t num_rc_layers;
+
+   // Rate control params (one for each layer).
    const struct enc_rate_control_params *rc_params;
 
    // Enable intra refresh, `gop_size` determines refresh interval.
@@ -188,7 +188,7 @@ struct enc_frame_params {
    // Frame QP. Only valid with `ENC_RATE_CONTROL_MODE_CQP`.
    uint16_t qp;
 
-   // Rate control params.
+   // Rate control params (one for each layer).
    const struct enc_rate_control_params *rc_params;
 
    // If set, encoder will output frame feedback info.

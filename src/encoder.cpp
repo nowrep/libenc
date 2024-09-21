@@ -84,9 +84,8 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
 
    codedbuf_size = aligned_width * aligned_height * 3 + (1 << 16);
 
-   update_frame_rate(params->frame_rate.num, params->frame_rate.den);
-   if (params->rc_params)
-      update_rate_control(params->rc_params);
+   num_layers = params->num_rc_layers ? params->num_rc_layers : 1;
+   update_rate_control(params->rc_params);
 
    return true;
 }
@@ -191,32 +190,39 @@ void enc_encoder::release_buffer(VABufferID buffer)
    }
 }
 
-void enc_encoder::update_frame_rate(uint32_t num, uint32_t den)
-{
-   VAEncMiscParameterFrameRate fr = {};
-   fr.framerate = num | (den << 16);
-   add_misc_buffer(VAEncMiscParameterTypeFrameRate, sizeof(fr), &fr);
-}
-
 void enc_encoder::update_rate_control(const struct enc_rate_control_params *params)
 {
-   VAEncMiscParameterRateControl rc = {};
-   rc.bits_per_second = std::max(params->bit_rate, params->peak_bit_rate);
-   rc.target_percentage = (rc.bits_per_second * 100) / params->bit_rate;
-   rc.min_qp = params->min_qp;
-   rc.max_qp = params->max_qp;
-   rc.quality_factor = params->qvbr_quality;
-   rc.rc_flags.bits.disable_bit_stuffing = params->disable_filler_data;
-   add_misc_buffer(VAEncMiscParameterTypeRateControl, sizeof(rc), &rc);
+   for (uint32_t i = 0; i < num_layers; i++) {
+      uint32_t num = params[i].frame_rate;
+      uint32_t den = 1;
+      if (params[i].frame_rate - static_cast<uint32_t>(params[i].frame_rate) > 0.0001) {
+         num = params[i].frame_rate * 1000;
+         den = 1000;
+      }
+      VAEncMiscParameterFrameRate fr = {};
+      fr.framerate = num | (den << 16);
+      fr.framerate_flags.bits.temporal_id = i;
+      add_misc_buffer(VAEncMiscParameterTypeFrameRate, sizeof(fr), &fr);
+
+      VAEncMiscParameterRateControl rc = {};
+      rc.bits_per_second = std::max(params[i].bit_rate, params[i].peak_bit_rate);
+      rc.target_percentage = (rc.bits_per_second * 100) / params[i].bit_rate;
+      rc.min_qp = params[i].min_qp;
+      rc.max_qp = params[i].max_qp;
+      rc.quality_factor = params[i].qvbr_quality;
+      rc.rc_flags.bits.temporal_id = i;
+      rc.rc_flags.bits.disable_bit_stuffing = params[i].disable_filler_data;
+      add_misc_buffer(VAEncMiscParameterTypeRateControl, sizeof(rc), &rc);
+   }
 
    VAEncMiscParameterHRD hrd = {};
-   hrd.buffer_size = params->vbv_buffer_size;
-   hrd.initial_buffer_fullness = params->vbv_initial_fullness;
+   hrd.buffer_size = params[0].vbv_buffer_size;
+   hrd.initial_buffer_fullness = params[0].vbv_initial_fullness;
    add_misc_buffer(VAEncMiscParameterTypeHRD, sizeof(hrd), &hrd);
 
-   if (params->max_frame_size) {
+   if (params[0].max_frame_size) {
       VAEncMiscParameterBufferMaxFrameSize size = {};
-      size.max_frame_size = params->max_frame_size;
+      size.max_frame_size = params[0].max_frame_size;
       add_misc_buffer(VAEncMiscParameterTypeMaxFrameSize, sizeof(size), &size);
    }
 }

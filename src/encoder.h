@@ -26,7 +26,6 @@ struct enc_encoder
    VABufferID acquire_buffer();
    void release_buffer(VABufferID buffer);
 
-   void update_frame_rate(uint32_t num, uint32_t den);
    void update_rate_control(const struct enc_rate_control_params *params);
    void update_intra_refresh();
 
@@ -44,6 +43,7 @@ struct enc_encoder
    std::vector<std::pair<bool, VABufferID>> buffer_pool;
 
    uint32_t num_refs = 0;
+   uint32_t num_layers = 0;
    bool intra_refresh = false;
    uint32_t gop_size = 0;
    uint64_t gop_count = 0;

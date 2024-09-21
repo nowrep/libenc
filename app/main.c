@@ -199,6 +199,8 @@ int next_dropframe(void)
    return tok ? atoi(tok) : -1;
 }
 
+struct enc_rate_control_params rc_params[4];
+
 int main(int argc, char *argv[])
 {
    while (true) {
@@ -296,14 +298,13 @@ int main(int argc, char *argv[])
       return 2;
    }
 
-   struct enc_rate_control_params rc_params = {
-      .bit_rate = opt_bitrate * 1000,
-      .peak_bit_rate = opt_bitrate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1000.0 : 1500.0),
-      .vbv_buffer_size = opt_bitrate * 1000,
-      .vbv_initial_fullness = opt_bitrate * 1000,
-      .min_qp = 1,
-      .max_qp = 51,
-   };
+   rc_params[0].frame_rate = opt_fps;
+   rc_params[0].bit_rate = opt_bitrate * 1000;
+   rc_params[0].peak_bit_rate = opt_bitrate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1000.0 : 1500.0);
+   rc_params[0].vbv_buffer_size = opt_bitrate * 1000;
+   rc_params[0].vbv_initial_fullness = opt_bitrate * 1000;
+   rc_params[0].min_qp = 1;
+   rc_params[0].max_qp = 51;
 
    struct enc_encoder_params encoder_params = {
       .dev = dev,
@@ -313,12 +314,9 @@ int main(int argc, char *argv[])
       .bit_depth = 8,
       .num_refs = opt_refs,
       .gop_size = opt_gop,
-      .frame_rate = {
-         .num = opt_fps * 100,
-         .den = 100,
-      },
       .rc_mode = opt_rc,
-      .rc_params = &rc_params,
+      .num_rc_layers = 1,
+      .rc_params = rc_params,
       .intra_refresh = opt_intra_refresh,
       .h264 = {
          .profile = ENC_H264_PROFILE_HIGH,
