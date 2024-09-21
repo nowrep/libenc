@@ -20,10 +20,17 @@ enc_encoder::~enc_encoder()
 
 bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProfile profile, std::vector<VAConfigAttrib> &attribs)
 {
-   if (!aligned_width || !aligned_height)
-      return false;
-
    dpy = params->dev->dpy;
+
+   aligned_width = align(params->width, unit_width);
+   aligned_height = align(params->height, unit_height);
+
+   if (params->intra_refresh) {
+      intra_refresh = true;
+      gop_size = std::min(params->gop_size, aligned_width / unit_width);
+   } else {
+      gop_size = params->gop_size;
+   }
 
    VAConfigAttrib attrib;
    attrib.type = VAConfigAttribRTFormat;
@@ -93,6 +100,9 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    if (params->rc_params)
       update_rate_control(params->rc_params);
 
+   if (intra_refresh)
+      update_intra_refresh();
+
    return std::make_unique<enc_task>(this);
 }
 
@@ -108,7 +118,12 @@ bool enc_encoder::end_encode()
       return false;
 
    status = vaEndPicture(dpy, context_id);
-   return va_check(status, "vaEndPicture");
+   if (!va_check(status, "vaEndPicture"))
+      return false;
+
+   gop_count = (gop_count + 1) % gop_size;
+
+   return true;
 }
 
 void enc_encoder::add_buffer(VABufferType type, uint32_t size, const void *data)
@@ -204,4 +219,13 @@ void enc_encoder::update_rate_control(const struct enc_rate_control_params *para
       size.max_frame_size = params->max_frame_size;
       add_misc_buffer(VAEncMiscParameterTypeMaxFrameSize, sizeof(size), &size);
    }
+}
+
+void enc_encoder::update_intra_refresh()
+{
+   VAEncMiscParameterRIR rir = {};
+   rir.rir_flags.bits.enable_rir_column = 1;
+   rir.intra_insert_size = aligned_width / unit_width / gop_size;
+   rir.intra_insertion_location = gop_count * rir.intra_insert_size;
+   add_misc_buffer(VAEncMiscParameterTypeRIR, sizeof(rir), &rir);
 }

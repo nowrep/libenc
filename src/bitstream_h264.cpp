@@ -171,6 +171,24 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
    trailing_bits();
 }
 
+void bitstream_h264::write_sei_recovery_point(const sei_recovery_point &srp)
+{
+   write_nal_header(0, 6);
+
+   bitstream bs;
+   bs.ue(srp.recovery_frame_cnt);
+   bs.ui(srp.exact_match_flag, 1);
+   bs.ui(srp.broken_link_flag, 1);
+   bs.ui(srp.changing_slice_group_idc, 2);
+   bs.trailing_bits();
+
+   ui(6, 8); // last_payload_type_byte
+   ui(bs.size(), 8); // last_payload_size_byte
+
+   for (uint32_t i = 0; i < bs.size(); i++)
+      ui(bs.data()[i], 8);
+}
+
 void bitstream_h264::write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type)
 {
    ui(0x1, 32); // startcode

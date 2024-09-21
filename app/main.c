@@ -141,10 +141,12 @@ static int help(void)
    printf("  --rc RATE_CONTROL                    Set rate control mode (cqp, cbr, vbr, qvbr), default = cqp\n");
    printf("  --bitrate BITRATE_KBPS               Set bit rate in kbps, default = 10000\n");
    printf("  --qp QP                              Set QP, default = 22\n");
+   printf("  --intra-refresh                      Enable intra refresh\n");
    printf("\n");
    printf("  --maxframes NUM_FRAMES               Set maximum number of encoded frames\n");
    printf("  --norefs FRAMES                      List of comma separated frames to not be referenced\n");
    printf("  --dropframes FRAMES                  List of comma separated frames to drop in output\n");
+   printf("  --no-invalidate                      Don't invalidate dropped frames\n");
    return 1;
 }
 
@@ -160,6 +162,8 @@ static struct option long_options[] = {
    {"maxframes",        required_argument, NULL, ':'},
    {"norefs",           required_argument, NULL, ':'},
    {"dropframes",       required_argument, NULL, ':'},
+   {"intra-refresh",    no_argument,       NULL, ':'},
+   {"no-invalidate",    no_argument,       NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -174,6 +178,8 @@ uint16_t opt_qp = 22;
 uint64_t opt_maxframes = UINT64_MAX;
 char *opt_norefs = NULL;
 char *opt_dropframes = NULL;
+bool opt_intra_refresh = false;
+bool opt_invalidate = true;
 
 int next_noref(void)
 {
@@ -252,6 +258,12 @@ int main(int argc, char *argv[])
       case 10:
          opt_dropframes = optarg;
          break;
+      case 11:
+         opt_intra_refresh = true;
+         break;
+      case 12:
+         opt_invalidate = false;
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -307,6 +319,7 @@ int main(int argc, char *argv[])
       },
       .rc_mode = opt_rc,
       .rc_params = &rc_params,
+      .intra_refresh = opt_intra_refresh,
       .h264 = {
          .profile = ENC_H264_PROFILE_HIGH,
          .level_idc = 100,
@@ -362,7 +375,8 @@ int main(int argc, char *argv[])
 
       if (drop_frame > 0 && drop_frame == frame_num) {
          drop_frame = next_dropframe();
-         frame_params.invalidate_refs[frame_params.num_invalidate_refs++] = feedback.frame_id;
+         if (opt_invalidate)
+            frame_params.invalidate_refs[frame_params.num_invalidate_refs++] = feedback.frame_id;
       } else {
          frame_params.num_invalidate_refs = 0;
          uint32_t size = 0;

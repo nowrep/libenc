@@ -95,11 +95,19 @@ public:
       int8_t slice_beta_offset_div2;
    };
 
+   struct sei_recovery_point {
+      uint16_t recovery_frame_cnt;
+      uint8_t exact_match_flag;
+      uint8_t broken_link_flag;
+      uint8_t changing_slice_group_idc;
+   };
+
    bitstream_h264();
 
    void write_sps(const sps &sps);
    void write_pps(const pps &pps);
    void write_slice(const slice &slice, const sps &sps, const pps &pps);
+   void write_sei_recovery_point(const sei_recovery_point &srp);
 
 private:
    void write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type);

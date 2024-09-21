@@ -28,11 +28,14 @@ struct enc_encoder
 
    void update_frame_rate(uint32_t num, uint32_t den);
    void update_rate_control(const struct enc_rate_control_params *params);
+   void update_intra_refresh();
 
    VADisplay dpy;
    VAConfigID config_id = VA_INVALID_ID;
    VAContextID context_id = VA_INVALID_ID;
    uint32_t rt_format = 0;
+   uint32_t unit_width = 0;
+   uint32_t unit_height = 0;
    uint32_t aligned_width = 0;
    uint32_t aligned_height = 0;
    uint32_t codedbuf_size = 0;
@@ -41,4 +44,7 @@ struct enc_encoder
    std::vector<std::pair<bool, VABufferID>> buffer_pool;
 
    uint32_t num_refs = 0;
+   bool intra_refresh = false;
+   uint32_t gop_size = 0;
+   uint64_t gop_count = 0;
 };

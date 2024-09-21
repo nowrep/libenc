@@ -8,7 +8,6 @@ extern "C" {
 #endif
 
 #define ENC_MAX_REFERENCES 16
-#define ENC_TIMEOUT_INFINITE 0xFFFFFFFFFFFFFFFF
 
 enum enc_codec {
    ENC_CODEC_H264 = 0,
@@ -140,6 +139,9 @@ struct enc_encoder_params {
 
    // Rate control params.
    const struct enc_rate_control_params *rc_params;
+
+   // Enable intra refresh, `gop_size` determines refresh interval.
+   bool intra_refresh;
 
    union {
       struct enc_h264_encoder_params h264;

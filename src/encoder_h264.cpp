@@ -7,6 +7,8 @@
 encoder_h264::encoder_h264()
    : enc_encoder()
 {
+   unit_width = 16;
+   unit_height = 16;
 }
 
 bool encoder_h264::create(const struct enc_encoder_params *params)
@@ -15,7 +17,7 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
 
    VAConfigAttrib attrib;
    attrib.type = VAConfigAttribEncPackedHeaders;
-   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE | VA_ENC_PACKED_HEADER_SLICE;
+   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE | VA_ENC_PACKED_HEADER_SLICE | VA_ENC_PACKED_HEADER_RAW_DATA;
    attribs.push_back(attrib);
 
    VAProfile profile = VAProfileNone;
@@ -35,15 +37,10 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
       break;
    }
 
-   aligned_width = align(params->width, 16);
-   aligned_height = align(params->height, 16);
-
    if (!create_context(params, profile, attribs))
       return false;
 
    dpb.resize(dpb_surfaces.size());
-
-   gop_size = params->gop_size;
 
    sps.profile_idc = params->h264.profile;
    sps.constraint_set_flags = 0;
@@ -55,8 +52,8 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
    sps.pic_order_cnt_type = 2;
    sps.log2_max_pic_order_cnt_lsb_minus4 = 0;
    sps.max_num_ref_frames = num_refs;
-   sps.pic_width_in_mbs_minus1 = (aligned_width / 16) - 1;
-   sps.pic_height_in_map_units_minus1 = (aligned_height / 16) - 1;
+   sps.pic_width_in_mbs_minus1 = (aligned_width / unit_width) - 1;
+   sps.pic_height_in_map_units_minus1 = (aligned_height / unit_height) - 1;
    sps.frame_mbs_only_flag = 1;
    sps.direct_8x8_inference_flag = 1;
    if (aligned_width != params->width || aligned_height != params->height) {
@@ -89,27 +86,24 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    // Pick frame type
    enum enc_frame_type frame_type = params->frame_type;
    if (frame_type == ENC_FRAME_TYPE_UNKNOWN) {
-      if (frame_id == 0 || (gop_size != 0 && gop_count == gop_size - 1))
+      if (frame_id == 0 || (!intra_refresh && gop_size != 0 && gop_count == gop_size - 1))
          frame_type = ENC_FRAME_TYPE_IDR;
       else
          frame_type = ENC_FRAME_TYPE_P;
    }
 
    if (frame_type == ENC_FRAME_TYPE_IDR) {
-      gop_count = 0;
       frame_id = 0;
       pic_order_cnt = 0;
       for (auto &d : dpb)
          d.valid = false;
-   } else {
-      gop_count++;
    }
 
    // Invalidate requested refs
    for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
       uint64_t invalidate_id = params->invalidate_refs[i];
       for (auto &d : dpb) {
-         if (d.frame_id == invalidate_id) {
+         if (d.valid && d.frame_id == invalidate_id) {
             d.valid = false;
             break;
          }
@@ -167,7 +161,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
 
    bitstream_h264 bs;
 
-   if (frame_type == ENC_FRAME_TYPE_IDR) {
+   if (frame_type == ENC_FRAME_TYPE_IDR || (intra_refresh && gop_count == 0)) {
       VAEncSequenceParameterBufferH264 seq = {};
       seq.seq_parameter_set_id = sps.seq_parameter_set_id;
       seq.level_idc = sps.level_idc;
@@ -190,6 +184,14 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       seq.frame_crop_bottom_offset = sps.frame_crop_bottom_offset;
       seq.vui_parameters_present_flag = sps.vui_parameters_present_flag;
       add_buffer(VAEncSequenceParameterBufferType, sizeof(seq), &seq);
+
+      if (intra_refresh) {
+         bitstream_h264::sei_recovery_point srp = {};
+         srp.exact_match_flag = 1;
+         bs.write_sei_recovery_point(srp);
+         add_packed_header(VAEncPackedHeaderRawData, bs);
+         bs.reset();
+      }
 
       bs.write_sps(sps);
       add_packed_header(VAEncPackedHeaderSequence, bs);
@@ -267,7 +269,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
    VAEncSliceParameterBufferH264 sl = {};
-   sl.num_macroblocks = (aligned_width / 16) * (aligned_height / 16);
+   sl.num_macroblocks = (aligned_width / unit_width) * (aligned_height / unit_height);
    sl.macroblock_info = VA_INVALID_ID;
    sl.slice_type = slice.slice_type;
    sl.pic_parameter_set_id = slice.pic_parameter_set_id;
