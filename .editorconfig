@@ -1,0 +1,9 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+
+[*.{c,h,cpp,hpp,cc,hh,y,yy}]
+indent_style = space
+indent_size = 3
