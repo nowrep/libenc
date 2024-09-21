@@ -224,6 +224,15 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       slice.ref_list0_mod[0].modification_of_pic_nums_idc = 0;
       slice.ref_list0_mod[0].abs_diff_pic_num_minus1 = frame_id - dpb[ref_l0].frame_id - 1;
    }
+   slice.adaptive_ref_pic_marking_mode_flag = 0;
+   if (params->num_invalidate_refs) {
+      slice.adaptive_ref_pic_marking_mode_flag = 1;
+      slice.num_mmco_op = params->num_invalidate_refs;
+      for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
+         slice.mmco_op[i].memory_management_control_operation = 1;
+         slice.mmco_op[i].difference_of_pic_nums_minus1 = frame_id - params->invalidate_refs[i] - 1;
+      }
+   }
 
    VAEncPictureParameterBufferH264 pic = {};
    pic.CurrPic.picture_id = dpb_surfaces[recon_slot];

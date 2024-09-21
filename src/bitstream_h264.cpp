@@ -141,8 +141,17 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
       } else {
          ui(slice.adaptive_ref_pic_marking_mode_flag, 1);
          if (slice.adaptive_ref_pic_marking_mode_flag) {
-            for (uint32_t i = 0; i < slice.num_mmo_op; i++) {
-               // TODO
+            for (uint32_t i = 0; i < slice.num_mmco_op; i++) {
+               uint8_t op = slice.mmco_op[i].memory_management_control_operation;
+               ue(op);
+               if (op == 1 || op == 3)
+                  ue(slice.mmco_op[i].difference_of_pic_nums_minus1);
+               if (op == 2)
+                  ue(slice.mmco_op[i].long_term_pic_num);
+               if (op == 3 || op == 6)
+                  ue(slice.mmco_op[i].long_term_frame_idx);
+               if (op == 4)
+                  ue(slice.mmco_op[i].max_long_term_frame_idx_plus1);
             }
             ue(0x0); // memory_management_control_operation
          }

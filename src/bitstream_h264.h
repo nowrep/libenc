@@ -49,11 +49,18 @@ public:
       int16_t second_chroma_qp_index_offset;
    };
 
-   struct ref_list_mod
-   {
+   struct ref_list_mod {
       uint8_t modification_of_pic_nums_idc;
       uint32_t abs_diff_pic_num_minus1;
       uint32_t long_term_pic_num;
+   };
+
+   struct mmco_op {
+      uint8_t memory_management_control_operation;
+      uint32_t difference_of_pic_nums_minus1;
+      uint32_t long_term_pic_num;
+      uint32_t long_term_frame_idx;
+      uint32_t max_long_term_frame_idx_plus1;
    };
 
    struct slice {
@@ -79,8 +86,8 @@ public:
       uint8_t no_output_of_prior_pics_flag : 1;
       uint8_t long_term_reference_flag : 1;
       uint8_t adaptive_ref_pic_marking_mode_flag : 1;
-      uint8_t num_mmo_op;
-      // marking
+      uint8_t num_mmco_op;
+      struct mmco_op mmco_op[16];
       uint8_t cabac_init_idc;
       int16_t slice_qp_delta;
       uint8_t disable_deblocking_filter_idc;
