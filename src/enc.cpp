@@ -3,6 +3,7 @@
 #include "task.h"
 #include "surface.h"
 #include "encoder_h264.h"
+#include "encoder_hevc.h"
 
 #include <iostream>
 #include <memory>
@@ -48,6 +49,9 @@ struct enc_encoder *enc_encoder_create(const struct enc_encoder_params *params)
    switch (params->codec) {
    case ENC_CODEC_H264:
       encoder = std::make_unique<encoder_h264>();
+      break;
+   case ENC_CODEC_HEVC:
+      encoder = std::make_unique<encoder_hevc>();
       break;
    default:
       std::cerr << "Invalid codec " << params->codec << std::endl;

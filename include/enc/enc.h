@@ -11,6 +11,7 @@ extern "C" {
 
 enum enc_codec {
    ENC_CODEC_H264 = 0,
+   ENC_CODEC_HEVC = 1,
 };
 
 enum enc_format {
@@ -110,6 +111,7 @@ struct enc_rate_control_params {
 };
 
 #include <enc/enc_h264.h>
+#include <enc/enc_hevc.h>
 
 struct enc_encoder_params {
    // Device.
@@ -145,6 +147,7 @@ struct enc_encoder_params {
 
    union {
       struct enc_h264_encoder_params h264;
+      struct enc_hevc_encoder_params hevc;
    };
 };
 

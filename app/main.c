@@ -134,7 +134,7 @@ static int help(void)
    printf("\n");
    printf("Options:\n");
    printf("  --device DEVICE                      Set device to use, default = /dev/dri/renderD128\n");
-   printf("  --codec CODEC                        Set codec (h264), default = h264\n");
+   printf("  --codec CODEC                        Set codec (h264, hevc), default = h264\n");
    printf("  --refs NUM_REFS                      Set number of references, default = 1\n");
    printf("  --gop GOP_SIZE                       Set group of pictures size, default = 60\n");
    printf("  --fps FRAME_RATE                     Set frame rate, default = 30.0\n");
@@ -232,6 +232,8 @@ int main(int argc, char *argv[])
       case 1:
          if (!strcmp(optarg, "h264")) {
             opt_codec = ENC_CODEC_H264;
+         } else if (!strcmp(optarg, "hevc")) {
+            opt_codec = ENC_CODEC_HEVC;
          } else {
             fprintf(stderr, "Invalid codec value '%s'\n", optarg);
             return 1;
@@ -343,11 +345,14 @@ int main(int argc, char *argv[])
       .num_rc_layers = opt_rc_layers,
       .rc_params = rc_params,
       .intra_refresh = opt_intra_refresh,
-      .h264 = {
-         .profile = ENC_H264_PROFILE_HIGH,
-         .level_idc = 100,
-      },
    };
+   if (opt_codec == ENC_CODEC_H264) {
+      encoder_params.h264.profile = ENC_H264_PROFILE_HIGH;
+      encoder_params.h264.level_idc = 100;
+   } else if (opt_codec == ENC_CODEC_HEVC) {
+      encoder_params.hevc.profile = ENC_HEVC_PROFILE_MAIN;
+   }
+
    struct enc_encoder *enc = enc_encoder_create(&encoder_params);
    assert(enc);
 

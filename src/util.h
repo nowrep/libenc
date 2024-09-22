@@ -30,3 +30,8 @@ static inline std::pair<uint32_t, uint32_t> get_framerate(float fps)
    }
    return {num, den};
 }
+
+static inline uint32_t logbase2_ceil(uint32_t v)
+{
+   return ceil(log(v) / log(2.0));
+}
