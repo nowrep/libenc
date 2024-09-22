@@ -1,6 +1,7 @@
 #include "encoder.h"
 #include "surface.h"
 
+#include <assert.h>
 #include <string.h>
 #include <iostream>
 
@@ -12,8 +13,8 @@ enc_encoder::~enc_encoder()
 {
    for (auto &b : buffer_pool)
       vaDestroyBuffer(dpy, b.second);
-   if (!dpb_surfaces.empty())
-      vaDestroySurfaces(dpy, dpb_surfaces.data(), dpb_surfaces.size());
+   for (auto &d : dpb)
+      vaDestroySurfaces(dpy, &d.surface, 1);
    if (context_id != VA_INVALID_ID)
       vaDestroyContext(dpy, context_id);
    if (config_id != VA_INVALID_ID)
@@ -70,19 +71,21 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
    }
    attribs.push_back(attrib);
 
-   num_refs = params->num_refs;
-   dpb_surfaces.resize(num_refs + 1);
-   VAStatus status = vaCreateSurfaces(dpy, rt_format, aligned_width, aligned_height, dpb_surfaces.data(), dpb_surfaces.size(), nullptr, 0);
-   if (!va_check(status, "vaCreateSurfaces"))
-      return false;
-
-   status = vaCreateConfig(dpy, profile, VAEntrypointEncSlice, attribs.data(), attribs.size(), &config_id);
+   VAStatus status = vaCreateConfig(dpy, profile, VAEntrypointEncSlice, attribs.data(), attribs.size(), &config_id);
    if (!va_check(status, "vaCreateConfig"))
       return false;
 
    status = vaCreateContext(dpy, config_id, aligned_width, aligned_height, VA_PROGRESSIVE, nullptr, 0, &context_id);
    if (!va_check(status, "vaCreateContext"))
       return false;
+
+   num_refs = params->num_refs;
+   dpb.resize(num_refs + 1);
+   for (auto &d : dpb) {
+      status = vaCreateSurfaces(dpy, rt_format, aligned_width, aligned_height, &d.surface, 1, nullptr, 0);
+      if (!va_check(status, "vaCreateSurfaces"))
+         return false;
+   }
 
    codedbuf_size = aligned_width * aligned_height * 3 + (1 << 16);
 
@@ -94,6 +97,80 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
 
 std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_params *params)
 {
+   // Pick frame type
+   enc_params.frame_type = params->frame_type;
+   if (enc_params.frame_type == ENC_FRAME_TYPE_UNKNOWN) {
+      if (enc_params.frame_id == 0 || (!intra_refresh && gop_size != 0 && enc_params.gop_count == gop_size))
+         enc_params.frame_type = ENC_FRAME_TYPE_IDR;
+      else
+         enc_params.frame_type = ENC_FRAME_TYPE_P;
+   }
+
+   if (enc_params.frame_type == ENC_FRAME_TYPE_IDR) {
+      enc_params.frame_id = 0;
+      enc_params.gop_count = 0;
+      for (auto &d : dpb)
+         d.reset();
+   }
+
+   // Invalidate requested refs
+   for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
+      uint64_t invalidate_id = params->invalidate_refs[i];
+      for (auto &d : dpb) {
+         if (d.ok() && d.frame_id == invalidate_id) {
+            d.available = false;
+            break;
+         }
+      }
+   }
+
+   // Find ref_l0
+   enc_params.ref_l0_slot = 0xff;
+   if (enc_params.frame_type == ENC_FRAME_TYPE_P) {
+      // Use requested refs
+      if (params->num_ref_list0) {
+         uint64_t frame_id = params->ref_list0[0];
+         for (uint32_t i = 0; i < dpb.size(); i++) {
+            if (dpb[i].ok() && dpb[i].frame_id == frame_id) {
+               enc_params.ref_l0_slot = i;
+               break;
+            }
+         }
+      }
+
+      if (enc_params.ref_l0_slot == 0xff && num_refs > 0) {
+         uint64_t highest_id = 0;
+         for (uint32_t i = 0; i < dpb.size(); i++) {
+            if (dpb[i].ok() && dpb[i].frame_id >= highest_id) {
+               highest_id = dpb[i].frame_id;
+               enc_params.ref_l0_slot = i;
+            }
+         }
+      }
+
+      // No ref found, use I frame
+      if (enc_params.ref_l0_slot == 0xff)
+         enc_params.frame_type = ENC_FRAME_TYPE_I;
+   }
+
+   // Find available slot
+   enc_params.recon_slot = 0xff;
+   for (uint32_t i = 0; i < dpb.size(); i++) {
+      if (!dpb[i].valid) {
+         enc_params.recon_slot = i;
+         break;
+      }
+   }
+
+   enc_params.referenced = num_refs > 0 && (enc_params.frame_type != ENC_FRAME_TYPE_P || !params->not_referenced);
+   enc_params.need_sequence_headers = enc_params.frame_type == ENC_FRAME_TYPE_IDR || (intra_refresh && enc_params.gop_count % gop_size == 0);
+   enc_params.is_recovery_point = intra_refresh && enc_params.need_sequence_headers && enc_params.frame_id > 0;
+
+   assert(enc_params.recon_slot != 0xff);
+   dpb[enc_params.recon_slot].valid = enc_params.referenced;
+   dpb[enc_params.recon_slot].available = enc_params.referenced;
+   dpb[enc_params.recon_slot].frame_id = enc_params.frame_id;
+
    VAStatus status = vaBeginPicture(dpy, context_id, params->surface->surface_id);
    if (!va_check(status, "vaBeginPicture"))
       return {};
@@ -107,7 +184,7 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    return std::make_unique<enc_task>(this);
 }
 
-bool enc_encoder::end_encode()
+bool enc_encoder::end_encode(const struct enc_frame_params *params)
 {
    VAStatus status = vaRenderPicture(dpy, context_id, pic_buffers.data(), pic_buffers.size());
 
@@ -122,7 +199,48 @@ bool enc_encoder::end_encode()
    if (!va_check(status, "vaEndPicture"))
       return false;
 
-   gop_count = (gop_count + 1) % gop_size;
+   // Invalidate oldest reference
+   if (num_refs > 0) {
+      uint8_t used_refs = 0;
+      for (auto &d : dpb) {
+         if (d.valid)
+            used_refs++;
+      }
+
+      if (used_refs > num_refs) {
+         uint8_t slot = 0xff;
+         uint64_t lowest_id = UINT64_MAX;
+         for (uint32_t i = 0; i < dpb.size(); i++) {
+            if (i != enc_params.recon_slot && dpb[i].valid && dpb[i].frame_id < lowest_id) {
+               lowest_id = dpb[i].frame_id;
+               slot = i;
+            }
+         }
+         assert(slot != 0xff);
+         dpb[slot].reset();
+      }
+   }
+
+   if (params->feedback) {
+      memset(params->feedback, 0, sizeof(*params->feedback));
+      params->feedback->frame_type = enc_params.frame_type;
+      params->feedback->frame_id = enc_params.frame_id;
+      params->feedback->referenced = enc_params.referenced;
+      if (enc_params.ref_l0_slot != 0xff) {
+         params->feedback->num_ref_list0 = 1;
+         params->feedback->ref_list0[0] = dpb[enc_params.ref_l0_slot].frame_id;
+      }
+      for (auto &d : dpb) {
+         if (!d.valid)
+            continue;
+         params->feedback->ref[params->feedback->num_refs++] = d.frame_id;
+      }
+   }
+
+   if (enc_params.referenced)
+      enc_params.frame_id++;
+
+   enc_params.gop_count++;
 
    return true;
 }
@@ -234,6 +352,6 @@ void enc_encoder::update_intra_refresh()
    VAEncMiscParameterRIR rir = {};
    rir.rir_flags.bits.enable_rir_column = 1;
    rir.intra_insert_size = aligned_width / unit_width / gop_size;
-   rir.intra_insertion_location = gop_count * rir.intra_insert_size;
+   rir.intra_insertion_location = (enc_params.gop_count % gop_size) * rir.intra_insert_size;
    add_misc_buffer(VAEncMiscParameterTypeRIR, sizeof(rir), &rir);
 }

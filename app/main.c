@@ -431,15 +431,17 @@ int main(int argc, char *argv[])
       struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
       assert(enc_task_wait(task, UINT64_MAX));
 
-      if (feedback.reference)
+      if (feedback.referenced)
          ref_num++;
 
       if (drop_frame > 0 && drop_frame == ref_num) {
-         drop_frame = next_dropframe();
-         if (opt_invalidate)
+         if (feedback.referenced)
+            drop_frame = next_dropframe();
+         if (opt_invalidate && feedback.referenced)
             frame_params.invalidate_refs[frame_params.num_invalidate_refs++] = feedback.frame_id;
       } else {
-         frame_params.num_invalidate_refs = 0;
+         if (feedback.referenced)
+            frame_params.num_invalidate_refs = 0;
          uint32_t size = 0;
          uint8_t *data = NULL;
          while (enc_task_get_bitstream(task, &size, &data))
@@ -454,13 +456,13 @@ int main(int argc, char *argv[])
             hierarchy_idx = 1;
             for (uint32_t i = 0; i < 4; i++)
                hierarchy_frames[i] = feedback.frame_id;
-         } else if (feedback.reference) {
+         } else if (feedback.referenced) {
             hierarchy_frames[hierarchy_level] = feedback.frame_id;
          }
       }
 
       if (!quiet) {
-         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u ...", frame_num, feedback.frame_id, feedback.reference, hierarchy_level);
+         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u ...", frame_num, feedback.frame_id, feedback.referenced, hierarchy_level);
          fflush(stderr);
       }
 

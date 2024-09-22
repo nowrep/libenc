@@ -1,9 +1,6 @@
 #include "encoder_h264.h"
 #include "bitstream_h264.h"
 
-#include <string.h>
-#include <assert.h>
-
 encoder_h264::encoder_h264()
    : enc_encoder()
 {
@@ -40,7 +37,7 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
    if (!create_context(params, profile, attribs))
       return false;
 
-   dpb.resize(dpb_surfaces.size());
+   dpb_poc.resize(dpb.size());
 
    sps.profile_idc = params->h264.profile;
    sps.constraint_set_flags = 0;
@@ -48,9 +45,9 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
    sps.chroma_format_idc = 1,
    sps.bit_depth_luma_minus8 = params->bit_depth - 8;
    sps.bit_depth_chroma_minus8 = params->bit_depth - 8;
-   sps.log2_max_frame_num_minus4 = 0;
+   sps.log2_max_frame_num_minus4 = 4;
    sps.pic_order_cnt_type = 2;
-   sps.log2_max_pic_order_cnt_lsb_minus4 = 0;
+   sps.log2_max_pic_order_cnt_lsb_minus4 = 4;
    sps.max_num_ref_frames = num_refs;
    sps.pic_width_in_mbs_minus1 = (aligned_width / unit_width) - 1;
    sps.pic_height_in_map_units_minus1 = (aligned_height / unit_height) - 1;
@@ -89,94 +86,29 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
 
 struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *params)
 {
-   // Pick frame type
-   enum enc_frame_type frame_type = params->frame_type;
-   if (frame_type == ENC_FRAME_TYPE_UNKNOWN) {
-      if (frame_id == 0 || (!intra_refresh && gop_size != 0 && gop_count == gop_size - 1))
-         frame_type = ENC_FRAME_TYPE_IDR;
-      else
-         frame_type = ENC_FRAME_TYPE_P;
-   }
-
-   if (frame_type == ENC_FRAME_TYPE_IDR) {
-      frame_id = 0;
-      pic_order_cnt = 0;
-      for (auto &d : dpb)
-         d.valid = false;
-   }
-
-   // Invalidate requested refs
-   for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
-      uint64_t invalidate_id = params->invalidate_refs[i];
-      for (auto &d : dpb) {
-         if (d.valid && d.frame_id == invalidate_id) {
-            d.valid = false;
-            break;
-         }
-      }
-   }
-
-   // Find ref_l0
-   uint32_t ref_l0 = 0xff;
-   if (frame_type == ENC_FRAME_TYPE_P) {
-      // Use requested refs
-      if (params->num_ref_list0) {
-         uint64_t frame_id = params->ref_list0[0];
-         for (uint32_t i = 0; i < dpb.size(); i++) {
-            if (dpb[i].valid && dpb[i].frame_id == frame_id) {
-               ref_l0 = i;
-               break;
-            }
-         }
-      }
-
-      if (ref_l0 == 0xff && num_refs > 0) {
-         uint64_t highest_id = 0;
-         for (uint32_t i = 0; i < dpb.size(); i++) {
-            if (dpb[i].valid && dpb[i].frame_id >= highest_id) {
-               highest_id = dpb[i].frame_id;
-               ref_l0 = i;
-            }
-         }
-      }
-
-      // No ref found, use I frame
-      if (ref_l0 == 0xff)
-         frame_type = ENC_FRAME_TYPE_I;
-   }
-
-   // Find available slot
-   uint32_t recon_slot = 0xff;
-   for (uint32_t i = 0; i < dpb.size(); i++) {
-      if (!dpb[i].valid) {
-         recon_slot = i;
-         break;
-      }
-   }
-
-   bool not_referenced = num_refs == 0 || (frame_type == ENC_FRAME_TYPE_P && params->not_referenced);
-
-   assert(recon_slot != 0xff);
-   dpb[recon_slot].valid = !not_referenced;
-   dpb[recon_slot].frame_id = frame_id;
-   dpb[recon_slot].pic_order_cnt = pic_order_cnt;
-
    auto task = begin_encode(params);
    if (!task)
       return {};
+
+   const bool is_idr = enc_params.frame_type == ENC_FRAME_TYPE_IDR;
+
+   if (is_idr)
+      pic_order_cnt = 0;
+
+   dpb_poc[enc_params.recon_slot] = pic_order_cnt;
 
    bitstream_h264 bs;
 
    if (num_layers > 1) {
       bitstream_h264::prefix pfx;
       pfx.svc_extension_flag = 1;
-      pfx.temporal_id = frame_type == ENC_FRAME_TYPE_IDR ? 0 : params->temporal_id;
+      pfx.temporal_id = is_idr ? 0 : params->temporal_id;
       bs.write_prefix(pfx);
       add_packed_header(VAEncPackedHeaderRawData, bs);
       bs.reset();
    }
 
-   if (frame_type == ENC_FRAME_TYPE_IDR || (intra_refresh && gop_count == 0)) {
+   if (enc_params.need_sequence_headers) {
       VAEncSequenceParameterBufferH264 seq = {};
       seq.seq_parameter_set_id = sps.seq_parameter_set_id;
       seq.level_idc = sps.level_idc;
@@ -215,7 +147,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       seq.time_scale = sps.time_scale;
       add_buffer(VAEncSequenceParameterBufferType, sizeof(seq), &seq);
 
-      if (intra_refresh) {
+      if (enc_params.is_recovery_point) {
          bitstream_h264::sei_recovery_point srp = {};
          srp.exact_match_flag = 1;
          bs.write_sei_recovery_point(srp);
@@ -240,44 +172,46 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       bs.reset();
    }
 
-   if (frame_type == ENC_FRAME_TYPE_IDR) {
+   if (is_idr) {
       slice.nal_unit_type = 5;
       slice.nal_ref_idc = 3;
       slice.slice_type = 2;
       slice.idr_pic_id = idr_pic_id++;
    } else {
       slice.nal_unit_type = 1;
-      slice.nal_ref_idc = not_referenced ? 0 : 1;
-      if (frame_type == ENC_FRAME_TYPE_I)
+      slice.nal_ref_idc = !!enc_params.referenced;
+      if (enc_params.frame_type == ENC_FRAME_TYPE_I)
          slice.slice_type = 2;
-      else if (frame_type == ENC_FRAME_TYPE_P)
+      else if (enc_params.frame_type == ENC_FRAME_TYPE_P)
          slice.slice_type = 0;
    }
    slice.first_mb_in_slice = 0;
-   slice.frame_num = frame_id % (1 << (sps.log2_max_frame_num_minus4 + 4));
-   slice.pic_order_cnt_lsb = dpb[recon_slot].pic_order_cnt;
+   slice.frame_num = enc_params.frame_id % (1 << (sps.log2_max_frame_num_minus4 + 4));
+   slice.pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
    slice.slice_qp_delta = params->qp - (pps.pic_init_qp_minus26 + 26);
    slice.ref_pic_list_modification_flag_l0 = 0;
-   if (ref_l0 != 0xff && frame_id - dpb[ref_l0].frame_id > 1) {
+   if (enc_params.ref_l0_slot != 0xff && enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id > 1) {
       slice.ref_pic_list_modification_flag_l0 = 1;
       slice.num_ref_list0_mod = 1;
       slice.ref_list0_mod[0].modification_of_pic_nums_idc = 0;
-      slice.ref_list0_mod[0].abs_diff_pic_num_minus1 = frame_id - dpb[ref_l0].frame_id - 1;
+      slice.ref_list0_mod[0].abs_diff_pic_num_minus1 = enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id - 1;
    }
    slice.adaptive_ref_pic_marking_mode_flag = 0;
+   /*
    if (params->num_invalidate_refs) {
       slice.adaptive_ref_pic_marking_mode_flag = 1;
       slice.num_mmco_op = params->num_invalidate_refs;
       for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
-         if (frame_id > params->invalidate_refs[i]) {
+         if (enc_params.frame_id > params->invalidate_refs[i]) {
             slice.mmco_op[i].memory_management_control_operation = 1;
-            slice.mmco_op[i].difference_of_pic_nums_minus1 = frame_id - params->invalidate_refs[i] - 1;
+            slice.mmco_op[i].difference_of_pic_nums_minus1 = enc_params.frame_id - params->invalidate_refs[i] - 1;
          }
       }
    }
+   */
 
    VAEncPictureParameterBufferH264 pic = {};
-   pic.CurrPic.picture_id = dpb_surfaces[recon_slot];
+   pic.CurrPic.picture_id = dpb[enc_params.recon_slot].surface;
    pic.coded_buf = task->buffer_id;
    pic.pic_parameter_set_id = pps.pic_parameter_set_id;
    pic.seq_parameter_set_id = pps.seq_parameter_set_id;
@@ -287,7 +221,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    pic.num_ref_idx_l1_active_minus1 = pps.num_ref_idx_l1_default_active_minus1;
    pic.chroma_qp_index_offset = pps.chroma_qp_index_offset;
    pic.second_chroma_qp_index_offset = pps.second_chroma_qp_index_offset;
-   pic.pic_fields.bits.idr_pic_flag = frame_type == ENC_FRAME_TYPE_IDR;
+   pic.pic_fields.bits.idr_pic_flag = is_idr;
    pic.pic_fields.bits.reference_pic_flag = !!slice.nal_ref_idc;
    pic.pic_fields.bits.entropy_coding_mode_flag = pps.entropy_coding_mode_flag;
    pic.pic_fields.bits.weighted_pred_flag = pps.weighted_pred_flag;
@@ -300,11 +234,11 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       pic.ReferenceFrames[i].picture_id = VA_INVALID_ID;
       pic.ReferenceFrames[i].flags = VA_PICTURE_H264_INVALID;
    }
-   if (ref_l0 != 0xff) {
-      pic.ReferenceFrames[0].picture_id = dpb_surfaces[ref_l0];
-      pic.ReferenceFrames[0].frame_idx = dpb[ref_l0].frame_id;
-      pic.ReferenceFrames[0].TopFieldOrderCnt = dpb[ref_l0].pic_order_cnt;
-      pic.ReferenceFrames[0].BottomFieldOrderCnt = dpb[ref_l0].pic_order_cnt;
+   if (enc_params.ref_l0_slot != 0xff) {
+      pic.ReferenceFrames[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
+      pic.ReferenceFrames[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
+      pic.ReferenceFrames[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
+      pic.ReferenceFrames[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
    }
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
@@ -330,12 +264,12 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       sl.RefPicList1[i].picture_id = VA_INVALID_ID;
       sl.RefPicList1[i].flags = VA_PICTURE_H264_INVALID;
    }
-   if (ref_l0 != 0xff) {
-      sl.RefPicList0[0].picture_id = dpb_surfaces[ref_l0];
-      sl.RefPicList0[0].frame_idx = dpb[ref_l0].frame_id;
+   if (enc_params.ref_l0_slot != 0xff) {
+      sl.RefPicList0[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
+      sl.RefPicList0[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
       sl.RefPicList0[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
-      sl.RefPicList0[0].TopFieldOrderCnt = dpb[ref_l0].pic_order_cnt;
-      sl.RefPicList0[0].BottomFieldOrderCnt = dpb[ref_l0].pic_order_cnt;
+      sl.RefPicList0[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
+      sl.RefPicList0[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
    }
    add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
 
@@ -343,51 +277,12 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    add_packed_header(VAEncPackedHeaderSlice, bs);
    bs.reset();
 
-   if (!end_encode())
+   if (!end_encode(params))
       return {};
 
-   // Invalidate oldest reference
-   if (num_refs > 0) {
-      uint8_t used_refs = 0;
-      for (auto &d : dpb) {
-         if (d.valid)
-            used_refs++;
-      }
-
-      if (used_refs > num_refs) {
-         uint8_t slot = 0xff;
-         uint64_t lowest_id = UINT64_MAX;
-         for (uint32_t i = 0; i < dpb.size(); i++) {
-            if (i != recon_slot && dpb[i].valid && dpb[i].frame_id < lowest_id) {
-               lowest_id = dpb[i].frame_id;
-               slot = i;
-            }
-         }
-         assert(slot != 0xff);
-         dpb[slot].valid = false;
-      }
-   }
-
-   if (params->feedback) {
-      memset(params->feedback, 0, sizeof(*params->feedback));
-      params->feedback->frame_type = frame_type;
-      params->feedback->frame_id = frame_id;
-      params->feedback->reference = !not_referenced;
-      if (ref_l0 != 0xff) {
-         params->feedback->num_ref_list0 = 1;
-         params->feedback->ref_list0[0] = ref_l0;
-      }
-      for (auto &d : dpb) {
-         if (!d.valid)
-            continue;
-         params->feedback->ref[params->feedback->num_refs++] = d.frame_id;
-      }
-   }
-
-   if (!not_referenced)
-      frame_id++;
-
-   pic_order_cnt = (pic_order_cnt + 2) % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
+   pic_order_cnt += 2;
+   if (pic_order_cnt > INT32_MAX)
+      pic_order_cnt = 0;
 
    return task.release();
 }

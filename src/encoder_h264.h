@@ -19,14 +19,7 @@ private:
    bitstream_h264::pps pps = {};
    bitstream_h264::slice slice = {};
 
-   struct dpb_entry {
-      bool valid = false;
-      uint64_t frame_id = 0;
-      uint32_t pic_order_cnt = 0;
-   };
-   std::vector<dpb_entry> dpb;
-
-   uint64_t frame_id = 0;
-   uint32_t pic_order_cnt = 0;
    uint16_t idr_pic_id = 0;
+   uint32_t pic_order_cnt = 0;
+   std::vector<uint32_t> dpb_poc;
 };

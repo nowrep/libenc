@@ -159,7 +159,7 @@ struct enc_frame_feedback {
    uint64_t frame_id;
 
    // Frame is reference.
-   bool reference;
+   bool referenced;
 
    // Frame ids of references used to encode this frame.
    uint8_t num_ref_list0;
