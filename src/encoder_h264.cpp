@@ -63,7 +63,13 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
       sps.frame_crop_top_offset = 0;
       sps.frame_crop_bottom_offset = (aligned_height - params->height) / 2;
    }
-   sps.vui_parameters_present_flag = 0;
+   sps.vui_parameters_present_flag = 1;
+   sps.video_signal_type_present_flag = 1;
+   sps.video_format = 5;
+   sps.timing_info_present_flag = 1;
+   auto framerate = get_framerate(params->rc_params[0].frame_rate);
+   sps.time_scale = framerate.first * 2;
+   sps.num_units_in_tick = framerate.second;
 
    pps.entropy_coding_mode_flag = 1;
    pps.num_ref_idx_l0_default_active_minus1 = 0;
@@ -174,6 +180,9 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       VAEncSequenceParameterBufferH264 seq = {};
       seq.seq_parameter_set_id = sps.seq_parameter_set_id;
       seq.level_idc = sps.level_idc;
+      seq.intra_period = gop_size;
+      seq.intra_idr_period = gop_size;
+      seq.ip_period = 1;
       seq.max_num_ref_frames = sps.max_num_ref_frames;
       seq.picture_width_in_mbs = sps.pic_width_in_mbs_minus1 + 1;
       seq.picture_height_in_mbs = sps.pic_height_in_map_units_minus1 + 1;
@@ -192,6 +201,18 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       seq.frame_crop_top_offset = sps.frame_crop_top_offset;
       seq.frame_crop_bottom_offset = sps.frame_crop_bottom_offset;
       seq.vui_parameters_present_flag = sps.vui_parameters_present_flag;
+      seq.vui_fields.bits.aspect_ratio_info_present_flag = sps.aspect_ratio_info_present_flag;
+      seq.vui_fields.bits.timing_info_present_flag = sps.timing_info_present_flag;
+      seq.vui_fields.bits.bitstream_restriction_flag = sps.bitstream_restriction_flag;
+      seq.vui_fields.bits.log2_max_mv_length_horizontal = sps.log2_max_mv_length_horizontal;
+      seq.vui_fields.bits.log2_max_mv_length_vertical = sps.log2_max_mv_length_vertical;
+      seq.vui_fields.bits.fixed_frame_rate_flag = sps.fixed_frame_rate_flag;
+      seq.vui_fields.bits.motion_vectors_over_pic_boundaries_flag = sps.motion_vectors_over_pic_boundaries_flag;
+      seq.aspect_ratio_idc = sps.aspect_ratio_idc;
+      seq.sar_width = sps.sar_width;
+      seq.sar_height = sps.sar_height;
+      seq.num_units_in_tick = sps.num_units_in_tick;
+      seq.time_scale = sps.time_scale;
       add_buffer(VAEncSequenceParameterBufferType, sizeof(seq), &seq);
 
       if (intra_refresh) {

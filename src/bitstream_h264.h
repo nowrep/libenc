@@ -29,6 +29,35 @@ public:
       uint32_t frame_crop_top_offset;
       uint32_t frame_crop_bottom_offset;
       uint8_t vui_parameters_present_flag : 1;
+      uint8_t aspect_ratio_info_present_flag : 1;
+      uint8_t aspect_ratio_idc;
+      uint16_t sar_width;
+      uint16_t sar_height;
+      uint8_t overscan_info_present_flag : 1;
+      uint8_t overscan_appropriate_flag : 1;
+      uint8_t video_signal_type_present_flag : 1;
+      uint8_t video_format;
+      uint8_t video_full_range_flag : 1;
+      uint8_t colour_description_present_flag : 1;
+      uint8_t colour_primaries;
+      uint8_t transfer_characteristics;
+      uint8_t matrix_coefficients;
+      uint8_t chroma_loc_info_present_flag : 1;
+      uint8_t chroma_sample_loc_type_top_field;
+      uint8_t chroma_sample_loc_type_bottom_field;
+      uint8_t timing_info_present_flag : 1;
+      uint32_t num_units_in_tick;
+      uint32_t time_scale;
+      uint8_t fixed_frame_rate_flag : 1;
+      uint8_t pic_struct_present_flag : 1;
+      uint8_t bitstream_restriction_flag : 1;
+      uint8_t motion_vectors_over_pic_boundaries_flag : 1;
+      uint32_t max_bytes_per_pic_denom;
+      uint32_t max_bits_per_mb_denom;
+      uint8_t log2_max_mv_length_horizontal;
+      uint8_t log2_max_mv_length_vertical;
+      uint8_t max_num_reorder_frames;
+      uint8_t max_dec_frame_buffering;
    };
 
    struct pps {

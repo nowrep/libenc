@@ -49,7 +49,55 @@ void bitstream_h264::write_sps(const sps &sps)
       ue(sps.frame_crop_top_offset);
       ue(sps.frame_crop_bottom_offset);
    }
-   ui(0x0, 1); // vui_parameters_present_flag
+   ui(sps.vui_parameters_present_flag, 1);
+   if (sps.vui_parameters_present_flag) {
+      ui(sps.aspect_ratio_info_present_flag, 1);
+      if (sps.aspect_ratio_info_present_flag) {
+         ui(sps.aspect_ratio_idc, 8);
+         if (sps.aspect_ratio_idc == 255) {
+            ui(sps.sar_width, 16);
+            ui(sps.sar_height, 16);
+         }
+      }
+      ui(sps.overscan_info_present_flag, 1);
+      if (sps.overscan_info_present_flag)
+         ui(sps.overscan_appropriate_flag, 1);
+      ui(sps.video_signal_type_present_flag, 1);
+      if (sps.video_signal_type_present_flag) {
+         ui(sps.video_format, 3);
+         ui(sps.video_full_range_flag, 1);
+         ui(sps.colour_description_present_flag, 1);
+         if (sps.colour_description_present_flag) {
+            ui(sps.colour_primaries, 8);
+            ui(sps.transfer_characteristics, 8);
+            ui(sps.matrix_coefficients, 8);
+         }
+      }
+      ui(sps.chroma_loc_info_present_flag, 1);
+      if (sps.chroma_loc_info_present_flag) {
+         ue(sps.chroma_sample_loc_type_top_field);
+         ue(sps.chroma_sample_loc_type_bottom_field);
+      }
+      ui(sps.timing_info_present_flag, 1);
+      if (sps.timing_info_present_flag) {
+         ui(sps.num_units_in_tick, 32);
+         ui(sps.time_scale, 32);
+         ui(sps.fixed_frame_rate_flag, 1);
+      }
+      ui(0x0, 1); // nal_hrd_parameters_present_flag
+      ui(0x0, 1); // vcl_hrd_parameters_present_flag
+      ui(sps.pic_struct_present_flag, 1);
+      ui(sps.bitstream_restriction_flag, 1);
+      if (sps.bitstream_restriction_flag) {
+         ui(sps.motion_vectors_over_pic_boundaries_flag, 1);
+         ue(sps.max_bytes_per_pic_denom);
+         ue(sps.max_bits_per_mb_denom);
+         ue(sps.log2_max_mv_length_horizontal);
+         ue(sps.log2_max_mv_length_vertical);
+         ue(sps.max_num_reorder_frames);
+         ue(sps.max_dec_frame_buffering);
+      }
+   }
 
    trailing_bits();
 }

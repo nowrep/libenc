@@ -200,14 +200,9 @@ void enc_encoder::update_rate_control(const struct enc_rate_control_params *para
    }
 
    for (uint32_t i = 0; i < num_layers; i++) {
-      uint32_t num = params[i].frame_rate;
-      uint32_t den = 1;
-      if (params[i].frame_rate - static_cast<uint32_t>(params[i].frame_rate) > 0.0001) {
-         num = params[i].frame_rate * 1000;
-         den = 1000;
-      }
+      auto framerate = get_framerate(params[i].frame_rate);
       VAEncMiscParameterFrameRate fr = {};
-      fr.framerate = num | (den << 16);
+      fr.framerate = framerate.first | (framerate.second << 16);
       fr.framerate_flags.bits.temporal_id = i;
       add_misc_buffer(VAEncMiscParameterTypeFrameRate, sizeof(fr), &fr);
 
