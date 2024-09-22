@@ -149,6 +149,7 @@ static int help(void)
    printf("  --norefs FRAMES                      List of comma separated frames to not be referenced\n");
    printf("  --dropframes FRAMES                  List of comma separated frames to drop in output\n");
    printf("  --no-invalidate                      Don't invalidate dropped frames\n");
+   printf("  --gradual-qp                         Gradually change QP\n");
    return 1;
 }
 
@@ -168,6 +169,7 @@ static struct option long_options[] = {
    {"no-invalidate",    no_argument,       NULL, ':'},
    {"rc-layers",        required_argument, NULL, ':'},
    {"hierarchy",        required_argument, NULL, ':'},
+   {"gradual-qp",       no_argument,       NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -186,6 +188,7 @@ bool opt_intra_refresh = false;
 bool opt_invalidate = true;
 uint32_t opt_rc_layers = 1;
 uint8_t opt_hierarchy = 1;
+bool opt_gradual_qp = false;
 
 int next_noref(void)
 {
@@ -291,6 +294,9 @@ int main(int argc, char *argv[])
       case 14:
          opt_hierarchy = atoi(optarg);
          break;
+      case 15:
+         opt_gradual_qp = true;
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -373,6 +379,8 @@ int main(int argc, char *argv[])
    uint8_t hierarchy_level = 0;
    uint8_t hierarchy_idx = 0;
    uint64_t hierarchy_frames[4] = {0, 0, 0, 0};
+   uint16_t qp = opt_qp;
+   int16_t qp_sign = 1;
 
    struct enc_frame_feedback feedback;
    struct enc_frame_params frame_params = {
@@ -397,6 +405,17 @@ int main(int argc, char *argv[])
       frame_params.surface = surf;
       frame_params.not_referenced = false;
       frame_params.num_ref_list0 = 0;
+      frame_params.qp = qp;
+
+      if (opt_gradual_qp && frame_num % 2) {
+         qp += qp_sign;
+         if (qp >= 50) {
+            qp = 50;
+            qp_sign = -1;
+         } else if (qp == 1) {
+            qp_sign = 1;
+         }
+      }
 
       if (opt_hierarchy > 1) {
          hierarchy_level = hierarchy_levels[opt_hierarchy - 2][hierarchy_idx++];
