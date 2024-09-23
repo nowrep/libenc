@@ -15,6 +15,7 @@ AVCodecContext *av_codec_ctx;
 int av_stream_idx;
 AVFrame *av_frame;
 AVFrame *av_drm_frame;
+enum AVPixelFormat av_fmt;
 
 static int create_decoder(const char *device_path, const char *file_path)
 {
@@ -102,6 +103,7 @@ static bool decode_frame(struct enc_dmabuf *dmabuf)
    av_packet_free(&packet);
 
    if (frame) {
+      av_fmt = av_codec_ctx->sw_pix_fmt;
       av_frame_unref(av_drm_frame);
       av_drm_frame->format = AV_PIX_FMT_DRM_PRIME;
       if (av_hwframe_map(av_drm_frame, frame, AV_HWFRAME_MAP_READ) < 0) {
@@ -344,7 +346,6 @@ int main(int argc, char *argv[])
       .codec = opt_codec,
       .width = dmabuf.width,
       .height = dmabuf.height,
-      .bit_depth = 8,
       .num_refs = opt_refs,
       .gop_size = opt_gop,
       .rc_mode = opt_rc,
@@ -352,11 +353,27 @@ int main(int argc, char *argv[])
       .rc_params = rc_params,
       .intra_refresh = opt_intra_refresh,
    };
+
+   enum enc_format surface_format;
+   switch (av_fmt) {
+   case AV_PIX_FMT_YUV420P:
+      surface_format = ENC_FORMAT_NV12;
+      encoder_params.bit_depth = 8;
+      break;
+   case AV_PIX_FMT_YUV420P10:
+      surface_format = ENC_FORMAT_P010;
+      encoder_params.bit_depth = 10;
+      break;
+   default:
+      fprintf(stderr, "Unsupported format %u\n", av_fmt);
+      return 2;
+   };
+
    if (opt_codec == ENC_CODEC_H264) {
       encoder_params.h264.profile = ENC_H264_PROFILE_HIGH;
       encoder_params.h264.level_idc = 100;
    } else if (opt_codec == ENC_CODEC_HEVC) {
-      encoder_params.hevc.profile = ENC_HEVC_PROFILE_MAIN;
+      encoder_params.hevc.profile = encoder_params.bit_depth == 8 ? ENC_HEVC_PROFILE_MAIN : ENC_HEVC_PROFILE_MAIN_10;
    }
 
    struct enc_encoder *enc = enc_encoder_create(&encoder_params);
@@ -391,7 +408,7 @@ int main(int argc, char *argv[])
    do {
       struct enc_surface_params surface_params = {
          .dev = dev,
-         .format = ENC_FORMAT_NV12,
+         .format = surface_format,
          .width = dmabuf.width,
          .height = dmabuf.height,
          .dmabuf = &dmabuf,
