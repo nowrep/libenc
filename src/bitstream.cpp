@@ -69,6 +69,17 @@ void bitstream::ui(uint32_t value, uint8_t bits)
    }
 }
 
+void bitstream::leb128(uint64_t value)
+{
+   do {
+      uint8_t byte = value & 0x7f;
+      value >>= 7;
+      if (value)
+         byte |= 0x80;
+      ui(byte, 8);
+   } while (value);
+}
+
 void bitstream::byte_align()
 {
    uint32_t num_padding_zeros = (32 - bits_in_shifter) % 8;

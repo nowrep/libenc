@@ -2,6 +2,7 @@
 #include "dev.h"
 #include "task.h"
 #include "surface.h"
+#include "encoder_av1.h"
 #include "encoder_h264.h"
 #include "encoder_hevc.h"
 
@@ -47,6 +48,9 @@ struct enc_encoder *enc_encoder_create(const struct enc_encoder_params *params)
    std::unique_ptr<enc_encoder> encoder;
 
    switch (params->codec) {
+   case ENC_CODEC_AV1:
+      encoder = std::make_unique<encoder_av1>();
+      break;
    case ENC_CODEC_H264:
       encoder = std::make_unique<encoder_h264>();
       break;

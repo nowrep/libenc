@@ -10,8 +10,9 @@ extern "C" {
 #define ENC_MAX_REFERENCES 16
 
 enum enc_codec {
-   ENC_CODEC_H264 = 0,
-   ENC_CODEC_HEVC = 1,
+   ENC_CODEC_AV1 = 1,
+   ENC_CODEC_H264 = 2,
+   ENC_CODEC_HEVC = 3,
 };
 
 enum enc_format {
@@ -110,6 +111,7 @@ struct enc_rate_control_params {
    bool disable_filler_data;
 };
 
+#include <enc/enc_av1.h>
 #include <enc/enc_h264.h>
 #include <enc/enc_hevc.h>
 
@@ -146,6 +148,7 @@ struct enc_encoder_params {
    bool intra_refresh;
 
    union {
+      struct enc_av1_encoder_params av1;
       struct enc_h264_encoder_params h264;
       struct enc_hevc_encoder_params hevc;
    };

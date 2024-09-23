@@ -16,6 +16,7 @@ public:
    void ue(uint32_t value);
    void se(int32_t value);
    void ui(uint32_t value, uint8_t bits);
+   void leb128(uint64_t value);
 
    void byte_align();
    void trailing_bits();

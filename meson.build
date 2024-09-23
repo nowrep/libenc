@@ -19,9 +19,11 @@ files_libenc = files(
   'src/task.cpp',
   'src/surface.cpp',
   'src/bitstream.cpp',
+  'src/bitstream_av1.cpp',
   'src/bitstream_h264.cpp',
   'src/bitstream_hevc.cpp',
   'src/encoder.cpp',
+  'src/encoder_av1.cpp',
   'src/encoder_h264.cpp',
   'src/encoder_hevc.cpp',
 )

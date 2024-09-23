@@ -136,7 +136,7 @@ static int help(void)
    printf("\n");
    printf("Options:\n");
    printf("  --device DEVICE                      Set device to use, default = /dev/dri/renderD128\n");
-   printf("  --codec CODEC                        Set codec (h264, hevc), default = h264\n");
+   printf("  --codec CODEC                        Set codec (h264, hevc, av1), default = h264\n");
    printf("  --refs NUM_REFS                      Set number of references, default = 1\n");
    printf("  --gop GOP_SIZE                       Set group of pictures size, default = 60\n");
    printf("  --fps FRAME_RATE                     Set frame rate, default = 30.0\n");
@@ -239,6 +239,8 @@ int main(int argc, char *argv[])
             opt_codec = ENC_CODEC_H264;
          } else if (!strcmp(optarg, "hevc")) {
             opt_codec = ENC_CODEC_HEVC;
+         } else if (!strcmp(optarg, "av1")) {
+            opt_codec = ENC_CODEC_AV1;
          } else {
             fprintf(stderr, "Invalid codec value '%s'\n", optarg);
             return 1;
