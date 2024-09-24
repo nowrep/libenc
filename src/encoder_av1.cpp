@@ -134,28 +134,29 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    for (uint32_t i = 0; i < 7; i++)
       pic.ref_frame_idx[i] = 0xff;
    if (enc_params.ref_l0_slot != 0xff) {
-      uint32_t i = 0, ref_slot = 0xff;
-      for (auto &d : dpb) {
-         if (d.ok() && d.frame_id != enc_params.frame_id) {
-            if (d.surface == dpb[enc_params.ref_l0_slot].surface)
-               ref_slot = i;
-            pic.reference_frames[i++] = d.surface;
-         }
+      for (uint32_t i = 0; i < dpb.size(); i++) {
+         if (dpb[i].ok() && i != enc_params.recon_slot)
+            pic.reference_frames[dpb_ref_idx[i]] = dpb[i].surface;
       }
-      uint8_t ref_idx = dpb_ref_idx[enc_params.ref_l0_slot];
-      for (i = 0; i < 7; i++) {
+      uint32_t ref_idx = dpb_ref_idx[enc_params.ref_l0_slot];
+      for (uint32_t i = 0; i < 7; i++) {
+         pic.ref_frame_idx[i] = ref_idx;
          frame.ref_frame_idx[i] = ref_idx;
-         pic.ref_frame_idx[i] = ref_slot;
       }
-      pic.primary_ref_frame = ref_slot;
-      pic.ref_frame_ctrl_l0.fields.search_idx0 = ref_idx;
+      pic.primary_ref_frame = ref_idx;
+      pic.ref_frame_ctrl_l0.fields.search_idx0 = 1;
    }
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
+
+   bs.write_frame(frame);
+   add_packed_header(VAEncPackedHeaderPicture, bs);
+   bs.reset();
 
    if (!end_encode(params))
       return {};
 
-   ref_idx_slot = (ref_idx_slot + 1) % num_refs;
+   if (enc_params.referenced)
+      ref_idx_slot = (ref_idx_slot + 1) % num_refs;
 
    return task.release();
 }
