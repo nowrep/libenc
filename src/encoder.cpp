@@ -72,6 +72,8 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
    attribs.push_back(attrib);
 
    VAStatus status = vaCreateConfig(dpy, profile, VAEntrypointEncSlice, attribs.data(), attribs.size(), &config_id);
+   if (status == VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT)
+      status = vaCreateConfig(dpy, profile, VAEntrypointEncSliceLP, attribs.data(), attribs.size(), &config_id);
    if (!va_check(status, "vaCreateConfig"))
       return false;
 
