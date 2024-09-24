@@ -99,8 +99,23 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
 
    bitstream_h264 bs;
 
+   if (is_idr) {
+      slice.nal_unit_type = 5;
+      slice.nal_ref_idc = 3;
+      slice.slice_type = 2;
+      slice.idr_pic_id = idr_pic_id++;
+   } else {
+      slice.nal_unit_type = 1;
+      slice.nal_ref_idc = !!enc_params.referenced;
+      if (enc_params.frame_type == ENC_FRAME_TYPE_I)
+         slice.slice_type = 2;
+      else if (enc_params.frame_type == ENC_FRAME_TYPE_P)
+         slice.slice_type = 0;
+   }
+
    if (num_layers > 1) {
       bitstream_h264::prefix pfx;
+      pfx.nal_ref_idc = slice.nal_ref_idc;
       pfx.svc_extension_flag = 1;
       pfx.temporal_id = is_idr ? 0 : params->temporal_id;
       bs.write_prefix(pfx);
@@ -172,19 +187,6 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       bs.reset();
    }
 
-   if (is_idr) {
-      slice.nal_unit_type = 5;
-      slice.nal_ref_idc = 3;
-      slice.slice_type = 2;
-      slice.idr_pic_id = idr_pic_id++;
-   } else {
-      slice.nal_unit_type = 1;
-      slice.nal_ref_idc = !!enc_params.referenced;
-      if (enc_params.frame_type == ENC_FRAME_TYPE_I)
-         slice.slice_type = 2;
-      else if (enc_params.frame_type == ENC_FRAME_TYPE_P)
-         slice.slice_type = 0;
-   }
    slice.first_mb_in_slice = 0;
    slice.frame_num = enc_params.frame_id % (1 << (sps.log2_max_frame_num_minus4 + 4));
    slice.pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));

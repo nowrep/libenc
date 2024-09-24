@@ -7,7 +7,7 @@ bitstream_h264::bitstream_h264()
 
 void bitstream_h264::write_sps(const sps &sps)
 {
-   write_nal_header(0, 7);
+   write_nal_header(3, 7);
 
    ui(sps.profile_idc, 8);
    ui(sps.constraint_set_flags, 6);
@@ -104,7 +104,7 @@ void bitstream_h264::write_sps(const sps &sps)
 
 void bitstream_h264::write_pps(const pps &pps)
 {
-   write_nal_header(0, 8);
+   write_nal_header(3, 8);
 
    ue(pps.pic_parameter_set_id);
    ue(pps.seq_parameter_set_id);
@@ -221,7 +221,7 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
 
 void bitstream_h264::write_prefix(const prefix &pfx)
 {
-   write_nal_header(0, 14);
+   write_nal_header(pfx.nal_ref_idc, 14);
 
    ui(pfx.svc_extension_flag, 1);
    if (pfx.svc_extension_flag) {

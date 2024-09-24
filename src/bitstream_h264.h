@@ -125,6 +125,7 @@ public:
    };
 
    struct prefix {
+      uint8_t nal_ref_idc;
       uint8_t svc_extension_flag : 1;
       uint8_t idr_flag : 1;
       uint8_t priority_id;
