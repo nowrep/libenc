@@ -472,6 +472,10 @@ int main(int argc, char *argv[])
       }
 
       struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
+      if (!task) {
+         fprintf(stderr, "Failed to issue encode\n");
+         return 2;
+      }
       assert(enc_task_wait(task, UINT64_MAX));
 
       if (feedback.referenced)
