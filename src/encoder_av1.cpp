@@ -107,7 +107,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    frame.temporal_id = params->temporal_id;
    frame.show_frame = 1;
    frame.uniform_tile_spacing_flag = 1;
-   frame.base_q_idx = params->qp;
+   frame.base_q_idx = params->qp * 5;
 
    VAEncPictureParameterBufferAV1 pic = {};
    pic.frame_width_minus_1 = seq.max_frame_width_minus_1;
