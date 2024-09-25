@@ -39,8 +39,9 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    dpb_poc.resize(dpb.size());
 
    bitstream_hevc::profile_tier_level ptl = {};
-   ptl.profile_tier.general_profile_idc = 1;
-   ptl.general_level_idc = 120;
+   ptl.profile_tier.general_profile_idc = params->hevc.profile;
+   ptl.profile_tier.general_tier_flag = params->hevc.tier;
+   ptl.general_level_idc = params->hevc.level;
    ptl.profile_tier.general_profile_compatibility_flag = 1 << ptl.profile_tier.general_profile_idc;
    if ((ptl.profile_tier.general_profile_compatibility_flag >> 1) & 1)
       ptl.profile_tier.general_profile_compatibility_flag |= 4;

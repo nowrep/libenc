@@ -11,5 +11,5 @@ struct enc_h264_encoder_params {
    enum enc_h264_profile profile;
 
    // Matches H264 spec.
-   uint8_t level_idc;
+   uint8_t level;
 };

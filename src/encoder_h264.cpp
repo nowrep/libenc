@@ -41,7 +41,7 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
 
    sps.profile_idc = params->h264.profile;
    sps.constraint_set_flags = 0;
-   sps.level_idc = params->h264.level_idc;
+   sps.level_idc = params->h264.level;
    sps.chroma_format_idc = 1,
    sps.bit_depth_luma_minus8 = params->bit_depth - 8;
    sps.bit_depth_chroma_minus8 = params->bit_depth - 8;

@@ -373,9 +373,13 @@ int main(int argc, char *argv[])
 
    if (opt_codec == ENC_CODEC_H264) {
       encoder_params.h264.profile = ENC_H264_PROFILE_HIGH;
-      encoder_params.h264.level_idc = 100;
+      encoder_params.h264.level = 52; // 5.2
    } else if (opt_codec == ENC_CODEC_HEVC) {
       encoder_params.hevc.profile = encoder_params.bit_depth == 8 ? ENC_HEVC_PROFILE_MAIN : ENC_HEVC_PROFILE_MAIN_10;
+      encoder_params.hevc.level = 156; // 5.2
+   } else if (opt_codec == ENC_CODEC_AV1) {
+      encoder_params.av1.profile = ENC_AV1_PROFILE_0;
+      encoder_params.av1.level = 15; // 5.3
    }
 
    struct enc_encoder *enc = enc_encoder_create(&encoder_params);

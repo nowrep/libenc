@@ -35,8 +35,8 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
    dpb_ref_idx.resize(dpb.size());
 
    seq.seq_profile = params->av1.profile;
-   seq.seq_level_idx[0] = params->av1.seq_level_idx;
-   seq.seq_tier[0] = 1;
+   seq.seq_level_idx[0] = params->av1.level;
+   seq.seq_tier[0] = params->av1.tier;
    seq.timing_info_present_flag = 1;
    auto framerate = get_framerate(params->rc_params[0].frame_rate);
    seq.time_scale = framerate.first;
