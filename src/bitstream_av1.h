@@ -29,7 +29,6 @@ public:
       uint8_t enable_warped_motion : 1;
       uint8_t enable_dual_filter : 1;
       uint8_t enable_cdef : 1;
-      uint8_t enable_restoration : 1;
       uint8_t high_bitdepth : 1;
       uint8_t color_description_present_flag : 1;
       uint8_t color_primaries;
@@ -37,8 +36,6 @@ public:
       uint8_t matrix_coefficients;
       uint8_t color_range : 1;
       uint8_t chroma_sample_position;
-      uint8_t separate_uv_delta_q : 1;
-      uint8_t film_grain_params_present : 1;
    };
 
    struct frame {
@@ -55,18 +52,29 @@ public:
       uint8_t is_filter_switchable : 1;
       uint8_t interpolation_filter;
       uint8_t is_motion_mode_switchable : 1;
-      uint8_t use_ref_frame_mvs : 1;
       uint8_t disable_frame_end_update_cdf : 1;
       uint8_t uniform_tile_spacing_flag : 1;
-      // tile_info()
       uint8_t base_q_idx;
    };
 
-   bitstream_av1();
+   struct frame_offsets {
+      uint32_t obu_size;
+      uint32_t base_q_idx;
+      uint32_t segmentation_enabled;
+      uint32_t loop_filter_params;
+      uint32_t cdef_params;
+      uint32_t cdef_params_size;
+      uint32_t frame_header_end;
+   };
 
+   bitstream_av1(uint8_t obu_size_bytes);
+
+   void write_temporal_delimiter();
    void write_seq(const seq &seq);
-   void write_frame(const frame &frame);
+   frame_offsets write_frame(const frame &frame, const seq &seq);
 
 private:
-   void write_obu(uint8_t type, const bitstream &bs);
+   uint32_t write_obu(uint8_t type, const bitstream &bs, uint8_t size_bytes = 0);
+
+   uint8_t obu_size_bytes;
 };

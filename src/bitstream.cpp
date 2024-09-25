@@ -1,4 +1,5 @@
 #include "bitstream.h"
+#include "util.h"
 
 bitstream::bitstream()
 {
@@ -11,6 +12,11 @@ bitstream::~bitstream()
 uint32_t bitstream::size() const
 {
    return buf.size();
+}
+
+uint32_t bitstream::size_bits() const
+{
+   return size() * 8 + bits_in_shifter;
 }
 
 const uint8_t *bitstream::data() const
@@ -69,15 +75,23 @@ void bitstream::ui(uint32_t value, uint8_t bits)
    }
 }
 
-void bitstream::leb128(uint64_t value)
+void bitstream::le(uint64_t value, uint8_t bytes)
 {
-   do {
-      uint8_t byte = value & 0x7f;
-      value >>= 7;
-      if (value)
+   for (uint8_t i = 0; i < bytes; i++)
+      ui((value >> (i * 8)) & 0xff, 8);
+}
+
+void bitstream::leb128(uint64_t value, uint8_t bytes)
+{
+   if (!bytes)
+      bytes = (logbase2_ceil(value) + 7) / 7;
+
+   for (uint8_t i = 0; i < bytes; i++) {
+      uint8_t byte = (value >> (7 * i)) & 0x7f;
+      if (i != bytes - 1)
          byte |= 0x80;
       ui(byte, 8);
-   } while (value);
+   }
 }
 
 void bitstream::byte_align()

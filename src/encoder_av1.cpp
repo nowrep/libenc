@@ -14,7 +14,7 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
 
    VAConfigAttrib attrib;
    attrib.type = VAConfigAttribEncPackedHeaders;
-   // attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE | VA_ENC_PACKED_HEADER_SLICE;
+   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE;
    attrib.value = 0;
    attribs.push_back(attrib);
 
@@ -63,7 +63,10 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
 
    dpb_ref_idx[enc_params.recon_slot] = ref_idx_slot;
 
-   bitstream_av1 bs;
+   bitstream_av1 bs(4);
+   bs.write_temporal_delimiter();
+   add_packed_header(VAEncPackedHeaderRawData, bs);
+   bs.reset();
 
    if (enc_params.need_sequence_headers) {
       VAEncSequenceParameterBufferAV1 sq = {};
@@ -81,7 +84,6 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
       sq.seq_fields.bits.enable_warped_motion = seq.enable_warped_motion;
       sq.seq_fields.bits.enable_dual_filter = seq.enable_dual_filter;
       sq.seq_fields.bits.enable_cdef = seq.enable_cdef;
-      sq.seq_fields.bits.enable_restoration = seq.enable_restoration;
       sq.seq_fields.bits.bit_depth_minus8 = seq.high_bitdepth ? 2 : 0;
       sq.seq_fields.bits.subsampling_x = 1;
       sq.seq_fields.bits.subsampling_y = 1;
@@ -96,7 +98,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
       frame.frame_type = 0;
       frame.refresh_frame_flags = 0xff;
    } else {
-      frame.refresh_frame_flags = 1 << ref_idx_slot;
+      frame.refresh_frame_flags = enc_params.referenced ? 1 << ref_idx_slot : 0;
       if (enc_params.frame_type == ENC_FRAME_TYPE_I)
          frame.frame_type = 2;
       else if (enc_params.frame_type == ENC_FRAME_TYPE_P)
@@ -117,7 +119,6 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.picture_flags.bits.error_resilient_mode = frame.error_resilient_mode;
    pic.picture_flags.bits.disable_cdf_update = frame.disable_cdf_update;
    pic.picture_flags.bits.allow_high_precision_mv = frame.allow_high_precision_mv;
-   pic.picture_flags.bits.use_ref_frame_mvs = frame.use_ref_frame_mvs;
    pic.picture_flags.bits.disable_frame_end_update_cdf = frame.disable_frame_end_update_cdf;
    pic.picture_flags.bits.enable_frame_obu = 1;
    pic.picture_flags.bits.disable_frame_recon = !enc_params.referenced;
@@ -146,11 +147,19 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
       pic.primary_ref_frame = ref_idx;
       pic.ref_frame_ctrl_l0.fields.search_idx0 = 1;
    }
-   add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
-   bs.write_frame(frame);
+   auto offsets = bs.write_frame(frame, seq);
    add_packed_header(VAEncPackedHeaderPicture, bs);
    bs.reset();
+
+   pic.bit_offset_qindex = offsets.base_q_idx;
+   pic.bit_offset_segmentation = offsets.segmentation_enabled;
+   pic.bit_offset_loopfilter_params = offsets.loop_filter_params;
+   pic.bit_offset_cdef_params = offsets.cdef_params;
+   pic.size_in_bits_cdef_params = offsets.cdef_params_size;
+   pic.byte_offset_frame_hdr_obu_size = offsets.obu_size / 8;
+   pic.size_in_bits_frame_hdr_obu = offsets.frame_header_end;
+   add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
    if (!end_encode(params))
       return {};
