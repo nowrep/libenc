@@ -142,10 +142,20 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
 
       if (enc_params.ref_l0_slot == 0xff && num_refs > 0) {
          uint64_t highest_id = 0;
+         // Prefer short term reference
          for (uint32_t i = 0; i < dpb.size(); i++) {
-            if (dpb[i].ok() && dpb[i].frame_id >= highest_id) {
+            if (dpb[i].ok() && !dpb[i].long_term && dpb[i].frame_id >= highest_id) {
                highest_id = dpb[i].frame_id;
                enc_params.ref_l0_slot = i;
+            }
+         }
+         // Use long term references
+         if (enc_params.ref_l0_slot == 0xff) {
+            for (uint32_t i = 0; i < dpb.size(); i++) {
+               if (dpb[i].ok() && dpb[i].frame_id >= highest_id) {
+                  highest_id = dpb[i].frame_id;
+                  enc_params.ref_l0_slot = i;
+               }
             }
          }
       }
@@ -165,13 +175,25 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    }
 
    enc_params.referenced = num_refs > 0 && (enc_params.frame_type != ENC_FRAME_TYPE_P || !params->not_referenced);
+   enc_params.long_term = enc_params.referenced && params->long_term;
    enc_params.need_sequence_headers = enc_params.frame_type == ENC_FRAME_TYPE_IDR || (intra_refresh && enc_params.gop_count % gop_size == 0);
    enc_params.is_recovery_point = intra_refresh && enc_params.need_sequence_headers && enc_params.frame_id > 0;
+
+   if (enc_params.long_term) {
+      uint8_t long_term = 0;
+      for (auto &d : dpb) {
+         if (d.valid && d.long_term)
+            long_term++;
+      }
+      if (long_term == num_refs - 1)
+         enc_params.long_term = false;
+   }
 
    assert(enc_params.recon_slot != 0xff);
    dpb[enc_params.recon_slot].valid = enc_params.referenced;
    dpb[enc_params.recon_slot].available = enc_params.referenced;
    dpb[enc_params.recon_slot].frame_id = enc_params.frame_id;
+   dpb[enc_params.recon_slot].long_term = enc_params.long_term;
 
    VAStatus status = vaBeginPicture(dpy, context_id, params->surface->surface_id);
    if (!va_check(status, "vaBeginPicture"))
@@ -213,7 +235,7 @@ bool enc_encoder::end_encode(const struct enc_frame_params *params)
          uint8_t slot = 0xff;
          uint64_t lowest_id = UINT64_MAX;
          for (uint32_t i = 0; i < dpb.size(); i++) {
-            if (i != enc_params.recon_slot && dpb[i].valid && dpb[i].frame_id < lowest_id) {
+            if (i != enc_params.recon_slot && dpb[i].valid && !dpb[i].long_term && dpb[i].frame_id < lowest_id) {
                lowest_id = dpb[i].frame_id;
                slot = i;
             }
@@ -228,6 +250,7 @@ bool enc_encoder::end_encode(const struct enc_frame_params *params)
       params->feedback->frame_type = enc_params.frame_type;
       params->feedback->frame_id = enc_params.frame_id;
       params->feedback->referenced = enc_params.referenced;
+      params->feedback->long_term = enc_params.long_term;
       if (enc_params.ref_l0_slot != 0xff) {
          params->feedback->num_ref_list0 = 1;
          params->feedback->ref_list0[0] = dpb[enc_params.ref_l0_slot].frame_id;

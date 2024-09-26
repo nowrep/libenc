@@ -1,6 +1,8 @@
 #include "encoder_h264.h"
 #include "bitstream_h264.h"
 
+#include <algorithm>
+
 encoder_h264::encoder_h264()
    : enc_encoder()
 {
@@ -92,8 +94,10 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
 
    const bool is_idr = enc_params.frame_type == ENC_FRAME_TYPE_IDR;
 
-   if (is_idr)
+   if (is_idr) {
+      lt_num.clear();
       pic_order_cnt = 0;
+   }
 
    dpb_poc[enc_params.recon_slot] = pic_order_cnt;
 
@@ -192,25 +196,63 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    slice.pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
    slice.slice_qp_delta = params->qp - (pps.pic_init_qp_minus26 + 26);
    slice.ref_pic_list_modification_flag_l0 = 0;
-   if (enc_params.ref_l0_slot != 0xff && enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id > 1) {
-      slice.ref_pic_list_modification_flag_l0 = 1;
-      slice.num_ref_list0_mod = 1;
-      slice.ref_list0_mod[0].modification_of_pic_nums_idc = 0;
-      slice.ref_list0_mod[0].abs_diff_pic_num_minus1 = enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id - 1;
-   }
-   slice.adaptive_ref_pic_marking_mode_flag = 0;
-   /*
-   if (params->num_invalidate_refs) {
-      slice.adaptive_ref_pic_marking_mode_flag = 1;
-      slice.num_mmco_op = params->num_invalidate_refs;
-      for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
-         if (enc_params.frame_id > params->invalidate_refs[i]) {
-            slice.mmco_op[i].memory_management_control_operation = 1;
-            slice.mmco_op[i].difference_of_pic_nums_minus1 = enc_params.frame_id - params->invalidate_refs[i] - 1;
-         }
+   if (enc_params.ref_l0_slot != 0xff) {
+      if (dpb[enc_params.ref_l0_slot].long_term) {
+         slice.ref_pic_list_modification_flag_l0 = 1;
+         slice.num_ref_list0_mod = 1;
+         slice.ref_list0_mod[0].modification_of_pic_nums_idc = 2;
+         slice.ref_list0_mod[0].long_term_pic_num = lt_num[dpb[enc_params.ref_l0_slot].frame_id];
+      } else if (enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id > 1) {
+         slice.ref_pic_list_modification_flag_l0 = 1;
+         slice.num_ref_list0_mod = 1;
+         slice.ref_list0_mod[0].modification_of_pic_nums_idc = 0;
+         slice.ref_list0_mod[0].abs_diff_pic_num_minus1 = enc_params.frame_id - dpb[enc_params.ref_l0_slot].frame_id - 1;
       }
    }
-   */
+   slice.long_term_reference_flag = 0;
+   slice.adaptive_ref_pic_marking_mode_flag = 0;
+   if (enc_params.long_term) {
+      if (is_idr) {
+         slice.long_term_reference_flag = 1;
+         lt_num[enc_params.frame_id] = 0;
+      } else {
+         std::vector<uint8_t> ltr;
+         uint8_t dpb_size = 0;
+         uint64_t lowest_id = UINT64_MAX;
+         for (auto &d : dpb) {
+            if (d.frame_id == enc_params.frame_id)
+               continue;
+            if (d.ok() && d.long_term)
+               ltr.push_back(lt_num[d.frame_id]);
+            if (d.valid) {
+               dpb_size++;
+               if (!d.long_term && d.frame_id < lowest_id)
+                  lowest_id = d.frame_id;
+            }
+         }
+         std::sort(ltr.begin(), ltr.end());
+         uint8_t ltr_idx = 0xff;
+         for (uint32_t i = 0; i < ltr.size(); i++) {
+            if (ltr[i] != i) {
+               ltr_idx = i;
+               break;
+            }
+         }
+         if (ltr_idx == 0xff)
+            ltr_idx = ltr.size();
+         slice.adaptive_ref_pic_marking_mode_flag = 1;
+         slice.num_mmco_op = 0;
+         if (dpb_size == num_refs) {
+            slice.mmco_op[slice.num_mmco_op].memory_management_control_operation = 1;
+            slice.mmco_op[slice.num_mmco_op++].difference_of_pic_nums_minus1 = enc_params.frame_id - lowest_id - 1;
+         }
+         slice.mmco_op[slice.num_mmco_op].memory_management_control_operation = 4;
+         slice.mmco_op[slice.num_mmco_op++].max_long_term_frame_idx_plus1 = ltr.size() + 1;
+         slice.mmco_op[slice.num_mmco_op].memory_management_control_operation = 6;
+         slice.mmco_op[slice.num_mmco_op++].long_term_frame_idx = ltr_idx;
+         lt_num[enc_params.frame_id] = ltr_idx;
+      }
+   }
 
    VAEncPictureParameterBufferH264 pic = {};
    pic.CurrPic.picture_id = dpb[enc_params.recon_slot].surface;
@@ -269,7 +311,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    if (enc_params.ref_l0_slot != 0xff) {
       sl.RefPicList0[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
       sl.RefPicList0[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
-      sl.RefPicList0[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+      sl.RefPicList0[0].flags = dpb[enc_params.ref_l0_slot].long_term ? VA_PICTURE_H264_LONG_TERM_REFERENCE : VA_PICTURE_H264_SHORT_TERM_REFERENCE;
       sl.RefPicList0[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
       sl.RefPicList0[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
    }

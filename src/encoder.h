@@ -53,6 +53,7 @@ struct enc_encoder
       uint32_t ref_l0_slot = 0;
       uint64_t gop_count = 0;
       bool referenced = false;
+      bool long_term = false;
       bool need_sequence_headers = false;
       bool is_recovery_point = false;
    } enc_params;
@@ -62,6 +63,7 @@ struct enc_encoder
       bool available = false;
       VASurfaceID surface = VA_INVALID_SURFACE;
       uint64_t frame_id = 0;
+      bool long_term = false;
 
       bool ok() const {
          return valid && available;

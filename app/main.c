@@ -149,6 +149,7 @@ static int help(void)
    printf("\n");
    printf("  --maxframes NUM_FRAMES               Set maximum number of encoded frames\n");
    printf("  --norefs FRAMES                      List of comma separated frames to not be referenced\n");
+   printf("  --ltrframes FRAMES                   List of comma separated frames to use as long term reference\n");
    printf("  --dropframes FRAMES                  List of comma separated frames to drop in output\n");
    printf("  --no-invalidate                      Don't invalidate dropped frames\n");
    printf("  --gradual-qp                         Gradually change QP\n");
@@ -172,6 +173,7 @@ static struct option long_options[] = {
    {"rc-layers",        required_argument, NULL, ':'},
    {"hierarchy",        required_argument, NULL, ':'},
    {"gradual-qp",       no_argument,       NULL, ':'},
+   {"ltrframes",        required_argument, NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -191,6 +193,7 @@ bool opt_invalidate = true;
 uint32_t opt_rc_layers = 1;
 uint8_t opt_hierarchy = 1;
 bool opt_gradual_qp = false;
+char *opt_ltrframes = NULL;
 
 int next_noref(void)
 {
@@ -207,6 +210,15 @@ int next_dropframe(void)
       return -1;
    static char *save = NULL;
    char *tok = strtok_r(save ? NULL : opt_dropframes, ",", &save);
+   return tok ? atoi(tok) : -1;
+}
+
+int next_ltrframe(void)
+{
+   if (!opt_ltrframes)
+      return -1;
+   static char *save = NULL;
+   char *tok = strtok_r(save ? NULL : opt_ltrframes, ",", &save);
    return tok ? atoi(tok) : -1;
 }
 
@@ -300,6 +312,9 @@ int main(int argc, char *argv[])
          break;
       case 15:
          opt_gradual_qp = true;
+         break;
+      case 16:
+         opt_ltrframes = optarg;
          break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
@@ -399,6 +414,8 @@ int main(int argc, char *argv[])
    uint64_t frame_num = 0;
    uint64_t noref_frame = next_noref();
    uint64_t drop_frame = next_dropframe();
+   uint64_t ltr_frame = next_ltrframe();
+   uint64_t last_ltr_frame = UINT64_MAX;
    uint8_t hierarchy_level = 0;
    uint8_t hierarchy_idx = 0;
    uint64_t hierarchy_frames[4] = {0, 0, 0, 0};
@@ -427,8 +444,14 @@ int main(int argc, char *argv[])
 
       frame_params.surface = surf;
       frame_params.not_referenced = false;
+      frame_params.long_term = false;
       frame_params.num_ref_list0 = 0;
       frame_params.qp = qp;
+
+      if (last_ltr_frame < feedback.frame_id) {
+         frame_params.num_ref_list0 = 1;
+         frame_params.ref_list0[0] = last_ltr_frame;
+      }
 
       if (opt_gradual_qp && frame_num % 2) {
          qp += qp_sign;
@@ -475,6 +498,11 @@ int main(int argc, char *argv[])
          frame_params.not_referenced = true;
       }
 
+      if (ltr_frame > 0 && ltr_frame == frame_num) {
+         ltr_frame = next_ltrframe();
+         frame_params.long_term = true;
+      }
+
       struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
       if (!task) {
          fprintf(stderr, "Failed to issue encode\n");
@@ -484,6 +512,9 @@ int main(int argc, char *argv[])
 
       if (feedback.referenced)
          ref_num++;
+
+      if (feedback.long_term)
+         last_ltr_frame = feedback.frame_id;
 
       if (drop_frame > 0 && drop_frame == ref_num) {
          if (feedback.referenced)

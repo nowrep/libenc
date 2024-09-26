@@ -84,7 +84,9 @@ void bitstream_hevc::write_sps(const sps &sps)
    ue(sps.num_short_term_ref_pic_sets);
    for (uint32_t i = 0; i < sps.num_short_term_ref_pic_sets; i++)
       write_st_ref_pic_set(i, sps.st_ref_pic_set[i]);
-   ui(0x0, 1); // long_term_ref_pics_present_flag
+   ui(sps.long_term_ref_pics_present_flag, 1);
+   if (sps.long_term_ref_pics_present_flag)
+      ue(0x0); // num_long_term_ref_pics_sps
    ui(0x0, 1); // sps_temporal_mvp_enabled_flag
    ui(sps.strong_intra_smoothing_enabled_flag, 1);
    ui(sps.vui_parameters_present_flag, 1);
@@ -198,9 +200,19 @@ void bitstream_hevc::write_slice(const slice &slice, const sps &sps, const pps &
       ui(slice.slice_pic_order_cnt_lsb, sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
       ui(slice.short_term_ref_pic_set_sps_flag, 1);
       if (!slice.short_term_ref_pic_set_sps_flag)
-         write_st_ref_pic_set(sps.num_short_term_ref_pic_sets, slice.st_ref_pic_set);
+         write_st_ref_pic_set(sps.num_short_term_ref_pic_sets, sps.st_ref_pic_set[sps.num_short_term_ref_pic_sets]);
       else if (sps.num_short_term_ref_pic_sets > 1)
          ui(slice.short_term_ref_pic_set_idx, logbase2_ceil(sps.num_short_term_ref_pic_sets));
+      if (sps.long_term_ref_pics_present_flag) {
+         ue(slice.num_long_term_pics);
+         for (uint32_t i = 0; i < slice.num_long_term_pics; i++) {
+            ui(slice.poc_lsb_lt[i], sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
+            ui(slice.used_by_curr_pic_lt_flag[i], 1);
+            ui(slice.delta_poc_msb_present_flag[i], 1);
+            if (slice.delta_poc_msb_present_flag[i])
+               ue(slice.delta_poc_msb_cycle_lt[i]);
+         }
+      }
    }
    if (sps.sample_adaptive_offset_enabled_flag) {
       ui(slice.slice_sao_luma_flag, 1);

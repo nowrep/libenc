@@ -84,7 +84,8 @@ public:
       uint8_t amp_enabled_flag : 1;
       uint8_t sample_adaptive_offset_enabled_flag : 1;
       uint8_t num_short_term_ref_pic_sets;
-      struct st_ref_pic_set st_ref_pic_set[16];
+      struct st_ref_pic_set st_ref_pic_set[17];
+      uint8_t long_term_ref_pics_present_flag : 1;
       uint8_t strong_intra_smoothing_enabled_flag : 1;
       uint8_t vui_parameters_present_flag : 1;
       uint8_t aspect_ratio_info_present_flag : 1;
@@ -150,8 +151,12 @@ public:
       uint32_t pic_output_flag : 1;
       uint32_t slice_pic_order_cnt_lsb;
       uint8_t short_term_ref_pic_set_sps_flag : 1;
-      struct st_ref_pic_set st_ref_pic_set;
       uint8_t short_term_ref_pic_set_idx;
+      uint8_t num_long_term_pics;
+      uint32_t poc_lsb_lt[16];
+      uint8_t used_by_curr_pic_lt_flag[16];
+      uint8_t delta_poc_msb_present_flag[16];
+      uint32_t delta_poc_msb_cycle_lt[16];
       uint8_t slice_sao_luma_flag : 1;
       uint8_t slice_sao_chroma_flag : 1;
       uint8_t num_ref_idx_active_override_flag : 1;

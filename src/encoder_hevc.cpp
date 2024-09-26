@@ -80,6 +80,7 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    sps.bit_depth_chroma_minus8 = params->bit_depth - 8;
    sps.log2_max_pic_order_cnt_lsb_minus4 = 4;
    sps.sps_max_dec_pic_buffering_minus1[0] = num_refs;
+   sps.long_term_ref_pics_present_flag = 1;
    sps.vui_parameters_present_flag = 1;
    sps.video_signal_type_present_flag = 1;
    sps.video_format = 5;
@@ -165,25 +166,46 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    slice.slice_qp_delta = params->qp - (pps.init_qp_minus26 + 26);
    if (enc_params.ref_l0_slot != 0xff) {
       std::vector<uint64_t> ref_list0;
+      std::vector<uint64_t> ltr_list;
       for (uint32_t i = 0; i < dpb.size(); i++) {
-         if (dpb[i].valid && dpb_poc[i] < pic_order_cnt)
-            ref_list0.push_back(dpb_poc[i]);
+         if (dpb[i].valid && dpb_poc[i] < pic_order_cnt) {
+            if (dpb[i].long_term)
+               ltr_list.push_back(dpb_poc[i]);
+            else
+               ref_list0.push_back(dpb_poc[i]);
+         }
       }
+      std::sort(ltr_list.rbegin(), ltr_list.rend());
       std::sort(ref_list0.rbegin(), ref_list0.rend());
       uint64_t poc = pic_order_cnt;
       for (uint32_t i = 0; i < ref_list0.size(); i++) {
          uint64_t ref_poc = ref_list0[i];
-         slice.st_ref_pic_set.delta_poc_s0_minus1[i] = poc - ref_poc - 1;
-         slice.st_ref_pic_set.used_by_curr_pic_s0_flag[i] = ref_poc == dpb_poc[enc_params.ref_l0_slot];
+         sps.st_ref_pic_set[0].delta_poc_s0_minus1[i] = poc - ref_poc - 1;
+         sps.st_ref_pic_set[0].used_by_curr_pic_s0_flag[i] = ref_poc == dpb_poc[enc_params.ref_l0_slot];
          poc = ref_poc;
       }
-      slice.st_ref_pic_set.num_negative_pics = ref_list0.size();
+      sps.st_ref_pic_set[0].num_negative_pics = ref_list0.size();
+
+      uint32_t max_poc = 1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
+      poc = pic_order_cnt - (pic_order_cnt % max_poc);
+      for (uint32_t i = 0; i < ltr_list.size(); i++) {
+         uint64_t ltr_poc = ltr_list[i];
+         uint32_t ltr_lsb = ltr_poc % max_poc;
+         uint32_t ltr_msb = ltr_poc - ltr_lsb;
+         slice.poc_lsb_lt[i] = ltr_lsb;
+         slice.used_by_curr_pic_lt_flag[i] = ltr_poc == dpb_poc[enc_params.ref_l0_slot];
+         slice.delta_poc_msb_present_flag[i] = 1;
+         slice.delta_poc_msb_cycle_lt[i] = (poc - ltr_msb) / max_poc;
+         poc = ltr_poc;
+      }
+      slice.num_long_term_pics = ltr_list.size();
    }
 
    VAEncPictureParameterBufferHEVC pic = {};
    pic.decoded_curr_pic.picture_id = dpb[enc_params.recon_slot].surface;
    pic.decoded_curr_pic.flags = 0;
    pic.coded_buf = task->buffer_id;
+   pic.collocated_ref_pic_index = 0xff;
    pic.pic_init_qp = pps.init_qp_minus26 + 26;
    pic.diff_cu_qp_delta_depth = pps.diff_cu_qp_delta_depth;
    pic.pps_cb_qp_offset = pps.pps_cb_qp_offset;
@@ -213,6 +235,8 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    if (enc_params.ref_l0_slot != 0xff) {
       pic.reference_frames[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
       pic.reference_frames[0].pic_order_cnt = dpb_poc[enc_params.ref_l0_slot];
+      if (dpb[enc_params.ref_l0_slot].long_term)
+         pic.reference_frames[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 

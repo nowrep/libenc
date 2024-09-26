@@ -121,6 +121,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.picture_flags.bits.allow_high_precision_mv = frame.allow_high_precision_mv;
    pic.picture_flags.bits.disable_frame_end_update_cdf = frame.disable_frame_end_update_cdf;
    pic.picture_flags.bits.enable_frame_obu = 1;
+   pic.picture_flags.bits.long_term_reference = enc_params.long_term;
    pic.picture_flags.bits.disable_frame_recon = !enc_params.referenced;
    pic.temporal_id = frame.temporal_id;
    pic.base_qindex = frame.base_q_idx;
@@ -164,8 +165,16 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    if (!end_encode(params))
       return {};
 
-   if (enc_params.referenced)
-      ref_idx_slot = (ref_idx_slot + 1) % num_refs;
+   if (enc_params.referenced) {
+      std::vector<bool> ltr_slots(num_refs, false);
+      for (uint32_t i = 0; i < dpb.size(); i++) {
+         if (dpb[i].ok() && dpb[i].long_term)
+            ltr_slots[dpb_ref_idx[i]] = true;
+      }
+      do {
+         ref_idx_slot = (ref_idx_slot + 1) % num_refs;
+      } while (ltr_slots[ref_idx_slot]);
+   }
 
    return task.release();
 }

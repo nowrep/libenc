@@ -167,6 +167,9 @@ struct enc_frame_feedback {
    // Frame is reference.
    bool referenced;
 
+   // Frame is long term reference.
+   bool long_term;
+
    // Frame ids of references used to encode this frame.
    uint8_t num_ref_list0;
    uint64_t ref_list0[ENC_MAX_REFERENCES];
@@ -193,6 +196,9 @@ struct enc_frame_params {
 
    // If set, this frame will not be used as reference.
    bool not_referenced;
+
+   // If set, this frame will be used for long term reference.
+   bool long_term;
 
    // Frame QP. Only valid with `ENC_RATE_CONTROL_MODE_CQP`.
    uint16_t qp;
