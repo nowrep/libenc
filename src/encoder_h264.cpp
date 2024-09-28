@@ -127,6 +127,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       seq.intra_period = gop_size;
       seq.intra_idr_period = gop_size;
       seq.ip_period = 1;
+      seq.bits_per_second = initial_bit_rate;
       seq.max_num_ref_frames = sps.max_num_ref_frames;
       seq.picture_width_in_mbs = sps.pic_width_in_mbs_minus1 + 1;
       seq.picture_height_in_mbs = sps.pic_height_in_map_units_minus1 + 1;
