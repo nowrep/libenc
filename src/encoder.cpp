@@ -274,9 +274,8 @@ bool enc_encoder::end_encode(const struct enc_frame_params *params)
          params->feedback->ref_list0[0] = dpb[enc_params.ref_l0_slot].frame_id;
       }
       for (auto &d : dpb) {
-         if (!d.valid)
-            continue;
-         params->feedback->ref[params->feedback->num_refs++] = d.frame_id;
+         if (d.ok())
+            params->feedback->ref[params->feedback->num_refs++] = d.frame_id;
       }
    }
 
