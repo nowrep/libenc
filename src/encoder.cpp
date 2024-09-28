@@ -217,17 +217,17 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    if (!va_check(status, "vaBeginPicture"))
       return {};
 
+   return std::make_unique<enc_task>(this);
+}
+
+bool enc_encoder::end_encode(const struct enc_frame_params *params)
+{
    if (params->rc_params)
       update_rate_control(params->rc_params);
 
    if (intra_refresh)
       update_intra_refresh();
 
-   return std::make_unique<enc_task>(this);
-}
-
-bool enc_encoder::end_encode(const struct enc_frame_params *params)
-{
    VAStatus status = vaRenderPicture(dpy, context_id, pic_buffers.data(), pic_buffers.size());
 
    for (VABufferID buf : pic_buffers)
