@@ -49,6 +49,7 @@ struct enc_encoder
    uint32_t num_layers = 0;
    uint32_t gop_size = 0;
    bool intra_refresh = false;
+   uint32_t initial_bit_rate = 0;
 
    struct {
       enum enc_frame_type frame_type = ENC_FRAME_TYPE_UNKNOWN;

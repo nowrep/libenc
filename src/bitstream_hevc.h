@@ -83,9 +83,16 @@ public:
       uint8_t max_transform_hierarchy_depth_intra;
       uint8_t amp_enabled_flag : 1;
       uint8_t sample_adaptive_offset_enabled_flag : 1;
+      uint8_t pcm_enabled_flag : 1;
+      uint8_t pcm_sample_bit_depth_luma_minus1;
+      uint8_t pcm_sample_bit_depth_chroma_minus1;
+      uint8_t log2_min_pcm_luma_coding_block_size_minus3;
+      uint8_t log2_diff_max_min_pcm_luma_coding_block_size;
+      uint8_t pcm_loop_filter_disabled_flag : 1;
       uint8_t num_short_term_ref_pic_sets;
       struct st_ref_pic_set st_ref_pic_set[17];
       uint8_t long_term_ref_pics_present_flag : 1;
+      uint8_t sps_temporal_mvp_enabled_flag: 1;
       uint8_t strong_intra_smoothing_enabled_flag : 1;
       uint8_t vui_parameters_present_flag : 1;
       uint8_t aspect_ratio_info_present_flag : 1;
@@ -157,6 +164,7 @@ public:
       uint8_t used_by_curr_pic_lt_flag[16];
       uint8_t delta_poc_msb_present_flag[16];
       uint32_t delta_poc_msb_cycle_lt[16];
+      uint8_t slice_temporal_mvp_enabled_flag : 1;
       uint8_t slice_sao_luma_flag : 1;
       uint8_t slice_sao_chroma_flag : 1;
       uint8_t num_ref_idx_active_override_flag : 1;

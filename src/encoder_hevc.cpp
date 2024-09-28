@@ -29,6 +29,9 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    if (!create_context(params, attribs))
       return false;
 
+   features.value = get_config_attrib(VAConfigAttribEncHEVCFeatures);
+   block_sizes.value = get_config_attrib(VAConfigAttribEncHEVCBlockSizes);
+
    dpb_poc.resize(dpb.size());
 
    bitstream_hevc::profile_tier_level ptl = {};
@@ -72,8 +75,19 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    sps.bit_depth_luma_minus8 = params->bit_depth - 8;
    sps.bit_depth_chroma_minus8 = params->bit_depth - 8;
    sps.log2_max_pic_order_cnt_lsb_minus4 = 4;
+   sps.log2_min_luma_coding_block_size_minus3 = block_sizes.bits.log2_min_luma_coding_block_size_minus3;
+   sps.log2_diff_max_min_luma_coding_block_size = block_sizes.bits.log2_max_coding_tree_block_size_minus3 - block_sizes.bits.log2_min_luma_coding_block_size_minus3;
+   sps.log2_min_luma_transform_block_size_minus2 = block_sizes.bits.log2_min_luma_transform_block_size_minus2;
+   sps.log2_diff_max_min_luma_transform_block_size = block_sizes.bits.log2_max_luma_transform_block_size_minus2 - block_sizes.bits.log2_min_luma_transform_block_size_minus2;
+   sps.max_transform_hierarchy_depth_inter = block_sizes.bits.max_max_transform_hierarchy_depth_inter;
+   sps.max_transform_hierarchy_depth_intra = block_sizes.bits.max_max_transform_hierarchy_depth_intra;
+   sps.amp_enabled_flag = !!features.bits.amp;
+   sps.sample_adaptive_offset_enabled_flag = !!features.bits.sao;
+   sps.pcm_enabled_flag = !!features.bits.pcm;
    sps.sps_max_dec_pic_buffering_minus1[0] = num_refs;
    sps.long_term_ref_pics_present_flag = 1;
+   sps.sps_temporal_mvp_enabled_flag = !!features.bits.temporal_mvp;
+   sps.strong_intra_smoothing_enabled_flag = !!features.bits.strong_intra_smoothing;
    sps.vui_parameters_present_flag = 1;
    sps.video_signal_type_present_flag = 1;
    sps.video_format = 5;
@@ -81,8 +95,13 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    sps.vui_time_scale = vps.vps_time_scale;
    sps.vui_num_units_in_tick = vps.vps_num_units_in_tick;
 
+   pps.sign_data_hiding_enabled_flag = !!features.bits.sign_data_hiding;
    pps.num_ref_idx_l0_default_active_minus1 = 0;
    pps.init_qp_minus26 = 0;
+   pps.transform_skip_enabled_flag = !!features.bits.transform_skip;
+   pps.cu_qp_delta_enabled_flag = params->rc_mode != ENC_RATE_CONTROL_MODE_CQP ? !!features.bits.cu_qp_delta : 0;
+   pps.diff_cu_qp_delta_depth = sps.log2_diff_max_min_luma_coding_block_size;
+   pps.transquant_bypass_enabled_flag = !!features.bits.transquant_bypass;
    pps.pps_loop_filter_across_slices_enabled_flag = 1;
 
    return true;
@@ -111,6 +130,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       seq.intra_period = gop_size;
       seq.intra_idr_period = gop_size;
       seq.ip_period = 1;
+      seq.bits_per_second = initial_bit_rate;
       seq.pic_width_in_luma_samples = sps.pic_width_in_luma_samples;
       seq.pic_height_in_luma_samples = sps.pic_height_in_luma_samples;
       seq.seq_fields.bits.chroma_format_idc = sps.chroma_format_idc;
@@ -119,6 +139,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       seq.seq_fields.bits.strong_intra_smoothing_enabled_flag = sps.strong_intra_smoothing_enabled_flag;
       seq.seq_fields.bits.amp_enabled_flag = sps.amp_enabled_flag;
       seq.seq_fields.bits.sample_adaptive_offset_enabled_flag = sps.sample_adaptive_offset_enabled_flag;
+      seq.seq_fields.bits.sps_temporal_mvp_enabled_flag = sps.sps_temporal_mvp_enabled_flag;
       seq.log2_min_luma_coding_block_size_minus3 = sps.log2_min_luma_coding_block_size_minus3;
       seq.log2_diff_max_min_luma_coding_block_size = sps.log2_diff_max_min_luma_coding_block_size;
       seq.log2_min_transform_block_size_minus2 = sps.log2_min_luma_transform_block_size_minus2;
@@ -156,6 +177,9 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    slice.temporal_id = params->temporal_id;
    slice.first_slice_segment_in_pic_flag = 1;
    slice.slice_pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
+   slice.slice_temporal_mvp_enabled_flag = sps.sps_temporal_mvp_enabled_flag;
+   slice.slice_sao_luma_flag = sps.sample_adaptive_offset_enabled_flag;
+   slice.slice_sao_chroma_flag = sps.sample_adaptive_offset_enabled_flag;
    slice.slice_qp_delta = params->qp - (pps.init_qp_minus26 + 26);
    if (enc_params.ref_l0_slot != 0xff) {
       std::vector<uint64_t> ref_list0;
@@ -198,7 +222,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    pic.decoded_curr_pic.picture_id = dpb[enc_params.recon_slot].surface;
    pic.decoded_curr_pic.flags = 0;
    pic.coded_buf = task->buffer_id;
-   pic.collocated_ref_pic_index = 0xff;
+   pic.collocated_ref_pic_index = sps.sps_temporal_mvp_enabled_flag ? 0 : 0xff;
    pic.pic_init_qp = pps.init_qp_minus26 + 26;
    pic.diff_cu_qp_delta_depth = pps.diff_cu_qp_delta_depth;
    pic.pps_cb_qp_offset = pps.pps_cb_qp_offset;
@@ -246,6 +270,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    sl.slice_beta_offset_div2 = slice.slice_beta_offset_div2;
    sl.slice_tc_offset_div2 = slice.slice_tc_offset_div2;
    sl.slice_fields.bits.last_slice_of_pic_flag = 1;
+   sl.slice_fields.bits.slice_temporal_mvp_enabled_flag = slice.slice_temporal_mvp_enabled_flag;
    sl.slice_fields.bits.slice_sao_luma_flag = slice.slice_sao_luma_flag;
    sl.slice_fields.bits.slice_sao_chroma_flag = slice.slice_sao_chroma_flag;
    sl.slice_fields.bits.num_ref_idx_active_override_flag = slice.num_ref_idx_active_override_flag;

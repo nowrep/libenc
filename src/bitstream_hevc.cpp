@@ -34,6 +34,7 @@ void bitstream_hevc::write_vps(const vps &vps)
       ui(vps.vps_poc_proportional_to_timing_flag, 1);
       if (vps.vps_poc_proportional_to_timing_flag)
          ue(vps.vps_num_ticks_poc_diff_one_minus1);
+      ue(0x0); // vps_num_hrd_parameters
    }
    ui(0x0, 1); // vps_extension_flag
 
@@ -80,14 +81,21 @@ void bitstream_hevc::write_sps(const sps &sps)
    ui(0x0, 1); // scaling_list_enabled_flag
    ui(sps.amp_enabled_flag, 1);
    ui(sps.sample_adaptive_offset_enabled_flag, 1);
-   ui(0x0, 1); // pcm_enabled_flag
+   ui(sps.pcm_enabled_flag, 1);
+   if (sps.pcm_enabled_flag) {
+      ui(sps.pcm_sample_bit_depth_luma_minus1, 4);
+      ui(sps.pcm_sample_bit_depth_chroma_minus1, 4);
+      ue(sps.log2_min_pcm_luma_coding_block_size_minus3);
+      ue(sps.log2_diff_max_min_pcm_luma_coding_block_size);
+      ui(sps.pcm_loop_filter_disabled_flag, 1);
+   }
    ue(sps.num_short_term_ref_pic_sets);
    for (uint32_t i = 0; i < sps.num_short_term_ref_pic_sets; i++)
       write_st_ref_pic_set(i, sps.st_ref_pic_set[i]);
    ui(sps.long_term_ref_pics_present_flag, 1);
    if (sps.long_term_ref_pics_present_flag)
       ue(0x0); // num_long_term_ref_pics_sps
-   ui(0x0, 1); // sps_temporal_mvp_enabled_flag
+   ui(sps.sps_temporal_mvp_enabled_flag, 1);
    ui(sps.strong_intra_smoothing_enabled_flag, 1);
    ui(sps.vui_parameters_present_flag, 1);
    if (sps.vui_parameters_present_flag) {
@@ -133,6 +141,7 @@ void bitstream_hevc::write_sps(const sps &sps)
       }
       ui(0x0, 1); // bitstream_restriction_flag
    }
+   ui(0x0, 1); // sps_extension_present_flag
 
    trailing_bits();
 }
@@ -213,6 +222,8 @@ void bitstream_hevc::write_slice(const slice &slice, const sps &sps, const pps &
                ue(slice.delta_poc_msb_cycle_lt[i]);
          }
       }
+      if (sps.sps_temporal_mvp_enabled_flag)
+         ui(slice.slice_temporal_mvp_enabled_flag, 1);
    }
    if (sps.sample_adaptive_offset_enabled_flag) {
       ui(slice.slice_sao_luma_flag, 1);

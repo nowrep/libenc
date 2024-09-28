@@ -35,6 +35,8 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
       gop_size = params->gop_size;
    }
 
+   initial_bit_rate = params->rc_params[0].bit_rate;
+
    int32_t num_entrypoints = 0;
    std::vector<VAEntrypoint> entrypoints(vaMaxNumEntrypoints(dpy));
    vaQueryConfigEntrypoints(dpy, profile, entrypoints.data(), &num_entrypoints);

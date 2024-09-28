@@ -20,6 +20,9 @@ private:
    bitstream_hevc::pps pps = {};
    bitstream_hevc::slice slice = {};
 
+   VAConfigAttribValEncHEVCFeatures features = {};
+   VAConfigAttribValEncHEVCBlockSizes block_sizes = {};
+
    uint16_t idr_pic_id = 0;
    uint64_t pic_order_cnt = 0;
    std::vector<uint64_t> dpb_poc;
