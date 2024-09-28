@@ -55,6 +55,8 @@ public:
       uint8_t disable_frame_end_update_cdf : 1;
       uint8_t uniform_tile_spacing_flag : 1;
       uint8_t base_q_idx;
+      uint8_t tx_mode_select : 1;
+      uint8_t reduced_tx_set;
    };
 
    struct frame_offsets {

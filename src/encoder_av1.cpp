@@ -24,6 +24,10 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
    if (!create_context(params, attribs))
       return false;
 
+   features1.value = get_config_attrib(VAConfigAttribEncAV1);
+   features2.value = get_config_attrib(VAConfigAttribEncAV1Ext1);
+   features3.value = get_config_attrib(VAConfigAttribEncAV1Ext2);
+
    dpb_ref_idx.resize(dpb.size());
 
    seq.seq_profile = params->av1.profile;
@@ -38,6 +42,7 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
    seq.max_frame_width_minus_1 = aligned_width - 1;
    seq.max_frame_height_minus_1 = aligned_height - 1;
    seq.high_bitdepth = params->bit_depth == 10;
+   seq.chroma_sample_position = 1;
 
    return true;
 }
@@ -55,9 +60,12 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
 
    dpb_ref_idx[enc_params.recon_slot] = ref_idx_slot;
 
-   bitstream_av1 bs(4);
+   bitstream_av1 bs(features3.bits.obu_size_bytes_minus1 + 1);
+   uint32_t bs_offset = 0;
+
    bs.write_temporal_delimiter();
    add_packed_header(VAEncPackedHeaderRawData, bs);
+   bs_offset += bs.size_bits();
    bs.reset();
 
    if (enc_params.need_sequence_headers) {
@@ -67,6 +75,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
       sq.seq_tier = seq.seq_tier[0];
       sq.intra_period = gop_size;
       sq.ip_period = 1;
+      sq.bits_per_second = initial_bit_rate;
       sq.seq_fields.bits.still_picture = seq.still_picture;
       sq.seq_fields.bits.use_128x128_superblock = seq.use_128x128_superblock;
       sq.seq_fields.bits.enable_filter_intra = seq.enable_filter_intra;
@@ -83,6 +92,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
 
       bs.write_seq(seq);
       add_packed_header(VAEncPackedHeaderSequence, bs);
+      bs_offset += bs.size_bits();
       bs.reset();
    }
 
@@ -98,13 +108,17 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    }
    frame.temporal_id = params->temporal_id;
    frame.show_frame = 1;
+   frame.primary_ref_frame = enc_params.ref_l0_slot != 0xff ? 0 : 7;
    frame.uniform_tile_spacing_flag = 1;
    frame.base_q_idx = params->qp * 5;
+   frame.tx_mode_select = (features3.bits.tx_mode_support & 0x4) ? 1 : 0;
+   frame.reduced_tx_set = 1;
 
    VAEncPictureParameterBufferAV1 pic = {};
    pic.frame_width_minus_1 = seq.max_frame_width_minus_1;
    pic.frame_height_minus_1 = seq.max_frame_height_minus_1;
    pic.reconstructed_frame = dpb[enc_params.recon_slot].surface;
+   pic.primary_ref_frame = frame.primary_ref_frame;
    pic.coded_buf = task->buffer_id;
    pic.refresh_frame_flags = frame.refresh_frame_flags;
    pic.picture_flags.bits.frame_type = frame.frame_type;
@@ -112,6 +126,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.picture_flags.bits.disable_cdf_update = frame.disable_cdf_update;
    pic.picture_flags.bits.allow_high_precision_mv = frame.allow_high_precision_mv;
    pic.picture_flags.bits.disable_frame_end_update_cdf = frame.disable_frame_end_update_cdf;
+   pic.picture_flags.bits.reduced_tx_set = frame.reduced_tx_set;
    pic.picture_flags.bits.enable_frame_obu = 1;
    pic.picture_flags.bits.long_term_reference = enc_params.long_term;
    pic.picture_flags.bits.disable_frame_recon = !enc_params.referenced;
@@ -119,14 +134,14 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.base_qindex = frame.base_q_idx;
    pic.min_base_qindex = 1;
    pic.max_base_qindex = 255;
+   pic.mode_control_flags.bits.tx_mode = frame.tx_mode_select ? 2 : 0;
    pic.tile_cols = 1;
    pic.tile_rows = 1;
-   pic.width_in_sbs_minus_1[0] = align(aligned_width, 64) - 1;
-   pic.height_in_sbs_minus_1[0] = align(aligned_height, 64) - 1;
+   pic.width_in_sbs_minus_1[0] = align(aligned_width, 64) / 64 - 1;
+   pic.height_in_sbs_minus_1[0] = align(aligned_height, 64) / 64 - 1;
+   pic.tile_group_obu_hdr_info.bits.obu_has_size_field = 1;
    for (uint32_t i = 0; i < 8; i++)
       pic.reference_frames[i] = VA_INVALID_ID;
-   for (uint32_t i = 0; i < 7; i++)
-      pic.ref_frame_idx[i] = 0xff;
    if (enc_params.ref_l0_slot != 0xff) {
       for (uint32_t i = 0; i < dpb.size(); i++) {
          if (dpb[i].ok() && i != enc_params.recon_slot)
@@ -137,7 +152,6 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
          pic.ref_frame_idx[i] = ref_idx;
          frame.ref_frame_idx[i] = ref_idx;
       }
-      pic.primary_ref_frame = ref_idx;
       pic.ref_frame_ctrl_l0.fields.search_idx0 = 1;
    }
 
@@ -150,9 +164,12 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.bit_offset_loopfilter_params = offsets.loop_filter_params;
    pic.bit_offset_cdef_params = offsets.cdef_params;
    pic.size_in_bits_cdef_params = offsets.cdef_params_size;
-   pic.byte_offset_frame_hdr_obu_size = offsets.obu_size / 8;
+   pic.byte_offset_frame_hdr_obu_size = (bs_offset + offsets.obu_size) / 8;
    pic.size_in_bits_frame_hdr_obu = offsets.frame_header_end;
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
+
+   VAEncTileGroupBufferAV1 tile = {};
+   add_buffer(VAEncSliceParameterBufferType, sizeof(tile), &tile);
 
    if (!end_encode(params))
       return {};

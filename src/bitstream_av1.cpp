@@ -47,8 +47,8 @@ void bitstream_av1::write_seq(const seq &seq)
    bs.ui(seq.enable_warped_motion, 1);
    bs.ui(seq.enable_dual_filter, 1);
    bs.ui(0x0, 1); // enable_order_hint
-   bs.ui(0x0, 1); // seq_choose_screen_content_tools
-   bs.ui(0x0, 1); // seq_force_screen_content_tools
+   bs.ui(0x1, 1); // seq_choose_screen_content_tools
+   bs.ui(0x1, 1); // seq_choose_integer_mv
    bs.ui(0x0, 1); // enable_superres
    bs.ui(seq.enable_cdef, 1);
    bs.ui(0x0, 1); // enable_restoration
@@ -90,6 +90,7 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    else
       bs.ui(error_resilient_mode, 1);
    bs.ui(frame.disable_cdf_update, 1);
+   bs.ui(0x0, 1); // allow_screen_content_tools
    if (frame.frame_type != 3)
       bs.ui(0x0, 1); // frame_size_override_flag
    if (!frame_is_intra && !error_resilient_mode)
@@ -112,8 +113,13 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    if (!frame.disable_cdf_update)
       bs.ui(frame.disable_frame_end_update_cdf, 1);
    bs.ui(frame.uniform_tile_spacing_flag, 1);
+   bs.ui(0x0, 1); // increment_tile_cols_log2
+   bs.ui(0x0, 1); // increment_tile_rows_log2
    off.base_q_idx = bs.size_bits();
    bs.ui(frame.base_q_idx, 8);
+   bs.ui(0x0, 1); // DeltaQYDc delta_coded
+   bs.ui(0x0, 1); // DeltaQUDc delta_coded
+   bs.ui(0x0, 1); // DeltaQUAc delta_coded
    bs.ui(0x0, 1); // using_qmatrix
    off.segmentation_enabled = bs.size_bits();
    bs.ui(0x0, 1); // segmentation_enabled
@@ -127,19 +133,19 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    if (seq.enable_cdef) {
       off.cdef_params = bs.size_bits();
       bs.ui(0x0, 2); // cdef_damping_minus_3
-      bs.ui(0x0, 1); // cdef_bits
+      bs.ui(0x0, 2); // cdef_bits
       bs.ui(0x0, 4); // cdef_y_pri_strength[0]
       bs.ui(0x0, 2); // cdef_y_sec_strength[0]
       bs.ui(0x0, 4); // cdef_uv_pri_strength[0]
       bs.ui(0x0, 2); // cdef_uv_sec_strength[0]
       off.cdef_params_size = bs.size_bits() - off.cdef_params;
    }
-   bs.ui(0x0, 1); // tx_mode_select
+   bs.ui(frame.tx_mode_select, 1);
    if (!frame_is_intra)
       bs.ui(0x0, 1); // reference_select
    if (!frame_is_intra && !error_resilient_mode && seq.enable_warped_motion)
       bs.ui(0x0, 1); // allow_warped_motion
-   bs.ui(0x0, 1); // reduced_tx_set
+   bs.ui(frame.reduced_tx_set, 1);
    if (!frame_is_intra) {
       for (uint32_t i = 1; i <= 7; i++)
          bs.ui(0x0, 1); // is_global

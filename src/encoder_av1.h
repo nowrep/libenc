@@ -18,6 +18,10 @@ private:
    bitstream_av1::seq seq = {};
    bitstream_av1::frame frame = {};
 
+   VAConfigAttribValEncAV1 features1;
+   VAConfigAttribValEncAV1Ext1 features2;
+   VAConfigAttribValEncAV1Ext2 features3;
+
    uint32_t ref_idx_slot = 0;
    std::vector<uint32_t> dpb_ref_idx;
 };
