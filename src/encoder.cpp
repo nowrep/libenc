@@ -21,7 +21,7 @@ enc_encoder::~enc_encoder()
       vaDestroyConfig(dpy, config_id);
 }
 
-bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProfile profile, std::vector<VAConfigAttrib> &attribs)
+bool enc_encoder::create_context(const struct enc_encoder_params *params, std::vector<VAConfigAttrib> &attribs)
 {
    dpy = params->dev->dpy;
 
@@ -33,6 +33,20 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
       gop_size = std::min(params->gop_size, aligned_width / unit_width);
    } else {
       gop_size = params->gop_size;
+   }
+
+   int32_t num_entrypoints = 0;
+   std::vector<VAEntrypoint> entrypoints(vaMaxNumEntrypoints(dpy));
+   vaQueryConfigEntrypoints(dpy, profile, entrypoints.data(), &num_entrypoints);
+   for (int32_t i = 0; i < num_entrypoints; i++) {
+      if (entrypoints[i] == VAEntrypointEncSlice || entrypoints[i] == VAEntrypointEncSliceLP) {
+         entrypoint = entrypoints[i];
+         break;
+      }
+   }
+   if (!entrypoint) {
+      std::cerr << "No encode entrypoint available for profile " << profile << std::endl;
+      return false;
    }
 
    VAConfigAttrib attrib;
@@ -49,6 +63,10 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
       return false;
    }
    attrib.value = rt_format;
+   attribs.push_back(attrib);
+
+   attrib.type = VAConfigAttribEncPackedHeaders;
+   attrib.value = get_config_attrib(VAConfigAttribEncPackedHeaders);
    attribs.push_back(attrib);
 
    attrib.type = VAConfigAttribRateControl;
@@ -71,9 +89,7 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, VAProf
    }
    attribs.push_back(attrib);
 
-   VAStatus status = vaCreateConfig(dpy, profile, VAEntrypointEncSlice, attribs.data(), attribs.size(), &config_id);
-   if (status == VA_STATUS_ERROR_UNSUPPORTED_ENTRYPOINT)
-      status = vaCreateConfig(dpy, profile, VAEntrypointEncSliceLP, attribs.data(), attribs.size(), &config_id);
+   VAStatus status = vaCreateConfig(dpy, profile, entrypoint, attribs.data(), attribs.size(), &config_id);
    if (!va_check(status, "vaCreateConfig"))
       return false;
 
@@ -268,6 +284,16 @@ bool enc_encoder::end_encode(const struct enc_frame_params *params)
    enc_params.gop_count++;
 
    return true;
+}
+
+uint32_t enc_encoder::get_config_attrib(VAConfigAttribType type)
+{
+   VAConfigAttrib attrib;
+   attrib.type = type;
+   VAStatus status = vaGetConfigAttributes(dpy, profile, entrypoint, &attrib, 1);
+   if (!va_check(status, "vaGetConfigAttributes"))
+      return 0;
+   return attrib.value;
 }
 
 void enc_encoder::add_buffer(VABufferType type, uint32_t size, const void *data)

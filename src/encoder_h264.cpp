@@ -12,14 +12,6 @@ encoder_h264::encoder_h264()
 
 bool encoder_h264::create(const struct enc_encoder_params *params)
 {
-   std::vector<VAConfigAttrib> attribs;
-
-   VAConfigAttrib attrib;
-   attrib.type = VAConfigAttribEncPackedHeaders;
-   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE | VA_ENC_PACKED_HEADER_SLICE | VA_ENC_PACKED_HEADER_RAW_DATA;
-   attribs.push_back(attrib);
-
-   VAProfile profile = VAProfileNone;
    switch (params->h264.profile) {
    case ENC_H264_PROFILE_CONSTRAINED_BASELINE:
       profile = VAProfileH264ConstrainedBaseline;
@@ -36,7 +28,8 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
       break;
    }
 
-   if (!create_context(params, profile, attribs))
+   std::vector<VAConfigAttrib> attribs;
+   if (!create_context(params, attribs))
       return false;
 
    dpb_poc.resize(dpb.size());

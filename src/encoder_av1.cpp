@@ -10,15 +10,6 @@ encoder_av1::encoder_av1()
 
 bool encoder_av1::create(const struct enc_encoder_params *params)
 {
-   std::vector<VAConfigAttrib> attribs;
-
-   VAConfigAttrib attrib;
-   attrib.type = VAConfigAttribEncPackedHeaders;
-   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE;
-   attrib.value = 0;
-   attribs.push_back(attrib);
-
-   VAProfile profile = VAProfileNone;
    switch (params->av1.profile) {
    case ENC_AV1_PROFILE_0:
       profile = VAProfileAV1Profile0;
@@ -29,7 +20,8 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
       break;
    }
 
-   if (!create_context(params, profile, attribs))
+   std::vector<VAConfigAttrib> attribs;
+   if (!create_context(params, attribs))
       return false;
 
    dpb_ref_idx.resize(dpb.size());

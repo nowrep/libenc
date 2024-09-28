@@ -15,9 +15,11 @@ struct enc_encoder
    virtual bool create(const enc_encoder_params *params) = 0;
    virtual struct enc_task *encode_frame(const struct enc_frame_params *params) = 0;
 
-   bool create_context(const struct enc_encoder_params *params, VAProfile profile, std::vector<VAConfigAttrib> &attribs);
+   bool create_context(const struct enc_encoder_params *params, std::vector<VAConfigAttrib> &attribs);
    std::unique_ptr<enc_task> begin_encode(const struct enc_frame_params *params);
    bool end_encode(const struct enc_frame_params *params);
+
+   uint32_t get_config_attrib(VAConfigAttribType type);
 
    void add_buffer(VABufferType type, uint32_t size, const void *data);
    void add_misc_buffer(VAEncMiscParameterType type, uint32_t size, const void *data);
@@ -32,6 +34,8 @@ struct enc_encoder
    VADisplay dpy;
    VAConfigID config_id = VA_INVALID_ID;
    VAContextID context_id = VA_INVALID_ID;
+   VAProfile profile = {};
+   VAEntrypoint entrypoint = {};
    uint32_t rt_format = 0;
    uint32_t unit_width = 0;
    uint32_t unit_height = 0;

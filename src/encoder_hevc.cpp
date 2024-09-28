@@ -12,14 +12,6 @@ encoder_hevc::encoder_hevc()
 
 bool encoder_hevc::create(const struct enc_encoder_params *params)
 {
-   std::vector<VAConfigAttrib> attribs;
-
-   VAConfigAttrib attrib;
-   attrib.type = VAConfigAttribEncPackedHeaders;
-   attrib.value = VA_ENC_PACKED_HEADER_SEQUENCE | VA_ENC_PACKED_HEADER_PICTURE | VA_ENC_PACKED_HEADER_SLICE | VA_ENC_PACKED_HEADER_RAW_DATA;
-   attribs.push_back(attrib);
-
-   VAProfile profile = VAProfileNone;
    switch (params->hevc.profile) {
    case ENC_HEVC_PROFILE_MAIN:
       profile = VAProfileHEVCMain;
@@ -33,7 +25,8 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
       break;
    }
 
-   if (!create_context(params, profile, attribs))
+   std::vector<VAConfigAttrib> attribs;
+   if (!create_context(params, attribs))
       return false;
 
    dpb_poc.resize(dpb.size());
