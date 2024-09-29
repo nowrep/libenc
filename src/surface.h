@@ -13,4 +13,5 @@ struct enc_surface
 
    enc_dev *dev = nullptr;
    VASurfaceID surface_id = VA_INVALID_ID;
+   enc_color_standard color_standard = ENC_COLOR_STANDARD_UNKNOWN;
 };

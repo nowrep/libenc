@@ -19,6 +19,7 @@ enc_surface::~enc_surface()
 bool enc_surface::create(const struct enc_surface_params *params)
 {
    dev = const_cast<enc_dev *>(params->dev);
+   color_standard = params->color_standard;
 
    uint32_t rt_format = 0;
    uint32_t va_fourcc = 0;
@@ -127,6 +128,20 @@ bool enc_surface::export_dmabuf(struct enc_dmabuf *dmabuf)
    return true;
 }
 
+static VAProcColorStandardType va_color_standard(enc_color_standard standard)
+{
+   switch (standard) {
+   case ENC_COLOR_STANDARD_SRGB:
+      return VAProcColorStandardSRGB;
+   case ENC_COLOR_STANDARD_BT601:
+      return VAProcColorStandardBT601;
+   case ENC_COLOR_STANDARD_BT709:
+      return VAProcColorStandardBT709;
+   default:
+      return VAProcColorStandardNone;
+   }
+}
+
 bool enc_surface::copy(struct enc_surface *out)
 {
    VAContextID context_id = dev->get_proc_context();
@@ -137,6 +152,8 @@ bool enc_surface::copy(struct enc_surface *out)
 
    VAProcPipelineParameterBuffer proc = {};
    proc.surface = surface_id;
+   proc.surface_color_standard = va_color_standard(color_standard);
+   proc.output_color_standard = va_color_standard(out->color_standard);
 
    VABufferID buf;
    status = vaCreateBuffer(dev->dpy, context_id, VAProcPipelineParameterBufferType, sizeof(proc), 1, &proc, &buf);

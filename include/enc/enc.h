@@ -24,6 +24,13 @@ enum enc_format {
    ENC_FORMAT_BGRA10 = 5,
 };
 
+enum enc_color_standard {
+   ENC_COLOR_STANDARD_UNKNOWN = 0,
+   ENC_COLOR_STANDARD_SRGB = 1,
+   ENC_COLOR_STANDARD_BT601 = 2,
+   ENC_COLOR_STANDARD_BT709 = 3,
+};
+
 enum enc_rate_control_mode {
    ENC_RATE_CONTROL_MODE_CQP = 0,
    ENC_RATE_CONTROL_MODE_CBR = 1,
@@ -74,6 +81,9 @@ struct enc_surface_params {
    uint32_t width;
    uint32_t height;
 
+   // Color standard. Used for format conversions.
+   enum enc_color_standard color_standard;
+
    // Import dmabuf. Fd is owned by caller.
    const struct enc_dmabuf *dmabuf;
 };
@@ -84,7 +94,7 @@ void enc_surface_destroy(struct enc_surface *surface);
 // Exports surface to dmabuf. Fd is owned by caller.
 bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *dmabuf);
 
-// Copy surface, performing format conversion if needed.
+// Copy surface, performing format and color conversion if needed.
 bool enc_surface_copy(struct enc_surface *input, struct enc_surface *output);
 
 struct enc_rate_control_params {
