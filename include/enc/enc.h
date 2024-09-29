@@ -20,6 +20,8 @@ enum enc_format {
    ENC_FORMAT_P010 = 1,
    ENC_FORMAT_RGBA = 2,
    ENC_FORMAT_BGRA = 3,
+   ENC_FORMAT_RGBA10 = 4,
+   ENC_FORMAT_BGRA10 = 5,
 };
 
 enum enc_rate_control_mode {

@@ -39,6 +39,14 @@ bool enc_surface::create(const struct enc_surface_params *params)
       rt_format = VA_RT_FORMAT_RGB32;
       va_fourcc = VA_FOURCC_BGRA;
       break;
+   case ENC_FORMAT_RGBA10:
+      rt_format = VA_RT_FORMAT_RGB32_10;
+      va_fourcc = VA_FOURCC_A2R10G10B10;
+      break;
+   case ENC_FORMAT_BGRA10:
+      rt_format = VA_RT_FORMAT_RGB32_10;
+      va_fourcc = VA_FOURCC_A2B10G10R10;
+      break;
    default:
       std::cerr << "Invalid surface format " << params->format << std::endl;
       return false;
