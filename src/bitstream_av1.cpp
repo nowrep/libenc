@@ -153,7 +153,7 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    off.frame_header_end = bs.size_bits();
    bs.byte_align();
 
-   off.obu_size = write_obu(6, bs, obu_size_bytes);
+   off.obu_size = write_obu(6, bs, obu_size_bytes, frame.obu_extension_flag ? frame.temporal_id : 0xff);
 
    const uint32_t obu_offset = off.obu_size + (obu_size_bytes * 8);
    off.base_q_idx += obu_offset;
@@ -165,14 +165,18 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    return off;
 }
 
-uint32_t bitstream_av1::write_obu(uint8_t type, const bitstream &bs, uint8_t size_bytes)
+uint32_t bitstream_av1::write_obu(uint8_t type, const bitstream &bs, uint8_t size_bytes, uint8_t temporal_id)
 {
    ui(0x0, 1); // obu_forbidden_bit
    ui(type, 4);
-   ui(0x0, 1); // obu_extension_flag
+   ui(temporal_id != 0xff ? 1 : 0, 1); // obu_extension_flag
    ui(0x1, 1); // obu_has_size_field
    ui(0x0, 1); // obu_reserved_1bit
-
+   if (temporal_id != 0xff) {
+      ui(temporal_id, 3);
+      ui(0x0, 2); // spatial_id
+      ui(0x0, 3); // extension_header_reserved_3bits
+   }
    leb128(bs.size(), size_bytes);
    for (uint32_t i = 0; i < bs.size(); i++)
       ui(bs.data()[i], 8);

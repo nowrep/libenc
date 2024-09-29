@@ -31,12 +31,17 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
    dpb_ref_idx.resize(dpb.size());
 
    seq.seq_profile = params->av1.profile;
-   seq.seq_level_idx[0] = params->av1.level;
-   seq.seq_tier[0] = params->av1.tier;
    seq.timing_info_present_flag = 1;
    auto framerate = get_framerate(params->rc_params[0].frame_rate);
    seq.time_scale = framerate.first;
    seq.num_units_in_display_tick = framerate.second;
+   seq.operating_points_cnt_minus_1 = num_layers - 1;
+   for (uint32_t i = 0; i < num_layers; ++i) {
+      if (num_layers > 1)
+         seq.operating_point_idc[i] = ((1 << (num_layers - i)) - 1) | (1 << 8);
+      seq.seq_level_idx[i] = params->av1.level;
+      seq.seq_tier[i] = params->av1.tier;
+   }
    seq.frame_width_bits_minus_1 = logbase2_ceil(aligned_width) - 1;
    seq.frame_height_bits_minus_1 = logbase2_ceil(aligned_height) - 1;
    seq.max_frame_width_minus_1 = aligned_width - 1;
@@ -106,6 +111,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
       else if (enc_params.frame_type == ENC_FRAME_TYPE_P)
          frame.frame_type = 1;
    }
+   frame.obu_extension_flag = num_layers > 1;
    frame.temporal_id = params->temporal_id;
    frame.show_frame = 1;
    frame.primary_ref_frame = enc_params.ref_l0_slot != 0xff ? 0 : 7;

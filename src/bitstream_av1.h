@@ -39,6 +39,7 @@ public:
    };
 
    struct frame {
+      uint8_t obu_extension_flag : 1;
       uint8_t temporal_id;
       uint8_t frame_type;
       uint8_t show_frame : 1;
@@ -76,7 +77,7 @@ public:
    frame_offsets write_frame(const frame &frame, const seq &seq);
 
 private:
-   uint32_t write_obu(uint8_t type, const bitstream &bs, uint8_t size_bytes = 0);
+   uint32_t write_obu(uint8_t type, const bitstream &bs, uint8_t size_bytes = 0, uint8_t temporal_id = 0xff);
 
    uint8_t obu_size_bytes;
 };
