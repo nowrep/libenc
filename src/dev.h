@@ -4,6 +4,13 @@
 
 struct enc_dev
 {
+   enum vendor {
+      VENDOR_UNKNOWN = 0,
+      VENDOR_AMD,
+      VENDOR_INTEL,
+      VENDOR_ZINK,
+   };
+
    enc_dev();
    virtual ~enc_dev();
 
@@ -11,4 +18,5 @@ struct enc_dev
 
    int fd = -1;
    VADisplay dpy = nullptr;
+   vendor vendor = VENDOR_UNKNOWN;
 };

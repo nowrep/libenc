@@ -33,5 +33,18 @@ bool enc_dev::create(const struct enc_dev_params *params)
 
    int major_ver, minor_ver;
    VAStatus status = vaInitialize(dpy, &major_ver, &minor_ver);
-   return va_check(status, "vaInitialize");
+   if (!va_check(status, "vaInitialize"))
+      return false;
+
+   const char *vnd = vaQueryVendorString(dpy);
+   if (strstr(vnd, "Mesa Gallium")) {
+      if (strstr(vnd, "zink"))
+         vendor = VENDOR_ZINK;
+      else if (strstr(vnd, "radeonsi") || strstr(vnd, "r600"))
+         vendor = VENDOR_AMD;
+   } else if (strstr(vnd, "Intel")) {
+      vendor = VENDOR_INTEL;
+   }
+
+   return true;
 }
