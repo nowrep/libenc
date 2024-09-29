@@ -110,7 +110,7 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    frame.show_frame = 1;
    frame.primary_ref_frame = enc_params.ref_l0_slot != 0xff ? 0 : 7;
    frame.uniform_tile_spacing_flag = 1;
-   frame.base_q_idx = params->qp * 5;
+   frame.base_q_idx = params->qp;
    frame.tx_mode_select = (features3.bits.tx_mode_support & 0x4) ? 1 : 0;
    frame.reduced_tx_set = 1;
 

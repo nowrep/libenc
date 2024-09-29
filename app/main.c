@@ -360,6 +360,8 @@ int main(int argc, char *argv[])
       return 2;
    }
 
+   uint32_t codec_qp = opt_codec == ENC_CODEC_AV1 ? 5 : 1;
+
    for (uint32_t i = 0; i < opt_rc_layers; i++) {
       rc_params[i].frame_rate = opt_fps / (1 << i);
       rc_params[i].bit_rate = opt_bitrate / (1 << i) * 1000;
@@ -367,7 +369,7 @@ int main(int argc, char *argv[])
       rc_params[i].vbv_buffer_size = opt_bitrate * 1000;
       rc_params[i].vbv_initial_fullness = opt_bitrate * 1000;
       rc_params[i].min_qp = 1;
-      rc_params[i].max_qp = 51;
+      rc_params[i].max_qp = 51 * codec_qp;
    }
 
    struct enc_encoder_params encoder_params = {
@@ -437,7 +439,7 @@ int main(int argc, char *argv[])
 
    struct enc_frame_feedback feedback;
    struct enc_frame_params frame_params = {
-      .qp = opt_qp,
+      .qp = opt_qp * codec_qp,
       .feedback = &feedback,
    };
 
