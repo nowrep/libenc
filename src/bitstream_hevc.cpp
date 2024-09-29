@@ -277,7 +277,8 @@ void bitstream_hevc::write_profile_tier_level(uint8_t max_sublayers_minus1, cons
       ui(pt.general_profile_space, 2);
       ui(pt.general_tier_flag, 1);
       ui(pt.general_profile_idc, 5);
-      ui(pt.general_profile_compatibility_flag, 32);
+      for (uint32_t i = 0; i < 32; i++)
+         ui(pt.general_profile_compatibility_flag[i], 1);
       ui(pt.general_progressive_source_flag, 1);
       ui(pt.general_interlaced_source_flag, 1);
       ui(pt.general_non_packed_constraint_flag, 1);

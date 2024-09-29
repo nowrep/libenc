@@ -38,11 +38,9 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    ptl.profile_tier.general_profile_idc = params->hevc.profile;
    ptl.profile_tier.general_tier_flag = params->hevc.tier;
    ptl.general_level_idc = params->hevc.level;
-   ptl.profile_tier.general_profile_compatibility_flag = 1 << ptl.profile_tier.general_profile_idc;
-   if ((ptl.profile_tier.general_profile_compatibility_flag >> 1) & 1)
-      ptl.profile_tier.general_profile_compatibility_flag |= 4;
-   if ((ptl.profile_tier.general_profile_compatibility_flag >> 3) & 1)
-      ptl.profile_tier.general_profile_compatibility_flag |= 6;
+   ptl.profile_tier.general_profile_compatibility_flag[ptl.profile_tier.general_profile_idc] = 1;
+   if (ptl.profile_tier.general_profile_compatibility_flag[1])
+       ptl.profile_tier.general_profile_compatibility_flag[2] = 1;
    ptl.profile_tier.general_progressive_source_flag = 1;
    ptl.profile_tier.general_non_packed_constraint_flag = 1;
    ptl.profile_tier.general_frame_only_constraint_flag = 1;
@@ -59,7 +57,8 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    vps.vps_num_units_in_tick = framerate.second;
    vps.vps_poc_proportional_to_timing_flag = 1;
 
-   sps.sps_max_sub_layers_minus1 = num_layers - 1;
+   sps.sps_max_sub_layers_minus1 = vps.vps_max_sub_layers_minus1;
+   sps.sps_max_dec_pic_buffering_minus1[0] = vps.vps_max_dec_pic_buffering_minus1[0];
    sps.sps_temporal_id_nesting_flag = 1;
    sps.profile_tier_level = ptl;
    sps.chroma_format_idc = 1;

@@ -9,7 +9,7 @@ public:
       uint8_t general_profile_space;
       uint8_t general_tier_flag : 1;
       uint8_t general_profile_idc;
-      uint32_t general_profile_compatibility_flag;
+      uint8_t general_profile_compatibility_flag[32];
       uint8_t general_progressive_source_flag : 1;
       uint8_t general_interlaced_source_flag : 1;
       uint8_t general_non_packed_constraint_flag : 1;
