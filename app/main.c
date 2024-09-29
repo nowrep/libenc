@@ -143,9 +143,10 @@ static int help(void)
    printf("  --rc RATE_CONTROL                    Set rate control mode (cqp, cbr, vbr, qvbr), default = cqp\n");
    printf("  --bitrate BITRATE_KBPS               Set bit rate in kbps, default = 10000\n");
    printf("  --qp QP                              Set QP, default = 22\n");
-   printf("  --intra-refresh                      Enable intra refresh, default = false\n");
    printf("  --rc-layers NUM_LAYERS               Set number of rate control layers, default = 1\n");
    printf("  --hierarchy LEVEL                    Set reference hierarchy level, default = 1\n");
+   printf("  --intra-refresh                      Enable intra refresh, default = false\n");
+   printf("  --low-latency                        Enable low latency context, default = false\n");
    printf("\n");
    printf("  --maxframes NUM_FRAMES               Set maximum number of encoded frames\n");
    printf("  --norefs FRAMES                      List of comma separated frames to not be referenced\n");
@@ -174,6 +175,7 @@ static struct option long_options[] = {
    {"hierarchy",        required_argument, NULL, ':'},
    {"gradual-qp",       no_argument,       NULL, ':'},
    {"ltrframes",        required_argument, NULL, ':'},
+   {"low-latency",      no_argument,       NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -194,6 +196,7 @@ uint32_t opt_rc_layers = 1;
 uint8_t opt_hierarchy = 1;
 bool opt_gradual_qp = false;
 char *opt_ltrframes = NULL;
+bool opt_low_latency = false;
 
 int next_noref(void)
 {
@@ -316,6 +319,9 @@ int main(int argc, char *argv[])
       case 16:
          opt_ltrframes = optarg;
          break;
+      case 17:
+         opt_low_latency = true;
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -369,6 +375,7 @@ int main(int argc, char *argv[])
       .num_rc_layers = opt_rc_layers,
       .rc_params = rc_params,
       .intra_refresh = opt_intra_refresh,
+      .low_latency = opt_low_latency,
    };
 
    enum enc_format surface_format;

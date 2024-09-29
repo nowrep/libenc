@@ -92,6 +92,16 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
    }
    attribs.push_back(attrib);
 
+   if (params->low_latency) {
+      if (params->dev->vendor == enc_dev::VENDOR_AMD)
+         setenv("AMD_DEBUG", "lowlatencyenc", 1);
+      /*
+      attrib.type = VAConfigAttribLowLatency;
+      attrib.value = 1;
+      attribs.push_back(attrib);
+      */
+   }
+
    VAStatus status = vaCreateConfig(dpy, profile, entrypoint, attribs.data(), attribs.size(), &config_id);
    if (!va_check(status, "vaCreateConfig"))
       return false;

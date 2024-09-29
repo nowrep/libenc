@@ -147,6 +147,9 @@ struct enc_encoder_params {
    // Enable intra refresh, `gop_size` determines refresh interval.
    bool intra_refresh;
 
+   // Enable low latency context.
+   bool low_latency;
+
    union {
       struct enc_av1_encoder_params av1;
       struct enc_h264_encoder_params h264;

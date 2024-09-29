@@ -49,6 +49,7 @@ struct enc_encoder
    uint32_t num_layers = 0;
    uint32_t gop_size = 0;
    bool intra_refresh = false;
+   bool low_latency = false;
    uint32_t initial_bit_rate = 0;
 
    struct {
