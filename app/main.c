@@ -519,8 +519,10 @@ int main(int argc, char *argv[])
       if (drop_frame > 0 && drop_frame == ref_num) {
          if (feedback.referenced)
             drop_frame = next_dropframe();
-         if (opt_invalidate && feedback.referenced)
-            frame_params.invalidate_refs[frame_params.num_invalidate_refs++] = feedback.frame_id;
+         if (opt_invalidate && feedback.referenced) {
+            frame_params.num_invalidate_refs = 1;
+            frame_params.invalidate_refs[0] = feedback.frame_id;
+         }
       } else {
          if (feedback.referenced)
             frame_params.num_invalidate_refs = 0;

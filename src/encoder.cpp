@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <string.h>
 #include <iostream>
+#include <algorithm>
 
 enc_encoder::enc_encoder()
 {
@@ -137,7 +138,7 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    for (uint32_t i = 0; i < params->num_invalidate_refs; i++) {
       uint64_t invalidate_id = params->invalidate_refs[i];
       for (auto &d : dpb) {
-         if (d.ok() && d.frame_id == invalidate_id) {
+         if (d.ok() && (d.frame_id == invalidate_id || std::find(d.refs.begin(), d.refs.end(), invalidate_id) != d.refs.end())) {
             d.available = false;
             break;
          }
@@ -212,6 +213,12 @@ std::unique_ptr<enc_task> enc_encoder::begin_encode(const struct enc_frame_param
    dpb[enc_params.recon_slot].available = enc_params.referenced;
    dpb[enc_params.recon_slot].frame_id = enc_params.frame_id;
    dpb[enc_params.recon_slot].long_term = enc_params.long_term;
+   if (enc_params.ref_l0_slot != 0xff && enc_params.referenced) {
+      auto &refs = dpb[enc_params.ref_l0_slot].refs;
+      auto &current = dpb[enc_params.recon_slot].refs;
+      current.insert(current.end(), refs.size() < 16 ? refs.begin() : refs.begin() + 1, refs.end());
+      current.push_back(dpb[enc_params.ref_l0_slot].frame_id);
+   }
 
    VAStatus status = vaBeginPicture(dpy, context_id, params->surface->surface_id);
    if (!va_check(status, "vaBeginPicture"))
