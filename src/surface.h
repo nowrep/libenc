@@ -9,7 +9,8 @@ struct enc_surface
 
    bool create(const struct enc_surface_params *params);
    bool export_dmabuf(struct enc_dmabuf *dmabuf);
+   bool copy(struct enc_surface *out);
 
-   VADisplay dpy = nullptr;
+   enc_dev *dev = nullptr;
    VASurfaceID surface_id = VA_INVALID_ID;
 };

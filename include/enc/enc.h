@@ -84,6 +84,9 @@ void enc_surface_destroy(struct enc_surface *surface);
 // Exports surface to dmabuf. Fd is owned by caller.
 bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *dmabuf);
 
+// Copy surface, performing format conversion if needed.
+bool enc_surface_copy(struct enc_surface *input, struct enc_surface *output);
+
 struct enc_rate_control_params {
    // Frame rate.
    float frame_rate;

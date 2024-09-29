@@ -12,13 +12,13 @@ enc_surface::enc_surface()
 
 enc_surface::~enc_surface()
 {
-   if (dpy)
-      vaDestroySurfaces(dpy, &surface_id, 1);
+   if (dev)
+      vaDestroySurfaces(dev->dpy, &surface_id, 1);
 }
 
 bool enc_surface::create(const struct enc_surface_params *params)
 {
-   dpy = params->dev->dpy;
+   dev = const_cast<enc_dev *>(params->dev);
 
    uint32_t rt_format = 0;
    uint32_t va_fourcc = 0;
@@ -90,14 +90,17 @@ bool enc_surface::create(const struct enc_surface_params *params)
       attribs.push_back(attrib);
    }
 
-   VAStatus status = vaCreateSurfaces(dpy, rt_format, params->width, params->height, &surface_id, 1, attribs.data(), attribs.size());
+   VAStatus status = vaCreateSurfaces(dev->dpy, rt_format, params->width, params->height, &surface_id, 1, attribs.data(), attribs.size());
    return va_check(status, "vaCreateSurfaces");
 }
 
 bool enc_surface::export_dmabuf(struct enc_dmabuf *dmabuf)
 {
+   if (!dev)
+      return false;
+
    VADRMPRIMESurfaceDescriptor desc;
-   VAStatus status = vaExportSurfaceHandle(dpy, surface_id, VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2, VA_EXPORT_SURFACE_COMPOSED_LAYERS | VA_EXPORT_SURFACE_READ_WRITE, &desc);
+   VAStatus status = vaExportSurfaceHandle(dev->dpy, surface_id, VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2, VA_EXPORT_SURFACE_COMPOSED_LAYERS | VA_EXPORT_SURFACE_READ_WRITE, &desc);
    if (!va_check(status, "vaExportSurfaceHandle"))
       return false;
 
@@ -122,4 +125,30 @@ bool enc_surface::export_dmabuf(struct enc_dmabuf *dmabuf)
       }
    }
    return true;
+}
+
+bool enc_surface::copy(struct enc_surface *out)
+{
+   VAContextID context_id = dev->get_proc_context();
+
+   VAStatus status = vaBeginPicture(dev->dpy, context_id, out->surface_id);
+   if (!va_check(status, "vaBeginPicture"))
+      return false;
+
+   VAProcPipelineParameterBuffer proc = {};
+   proc.surface = surface_id;
+
+   VABufferID buf;
+   status = vaCreateBuffer(dev->dpy, context_id, VAProcPipelineParameterBufferType, sizeof(proc), 1, &proc, &buf);
+   if (!va_check(status, "vaCreateBuffer"))
+      return false;
+
+   status = vaRenderPicture(dev->dpy, context_id, &buf, 1);
+   vaDestroyBuffer(dev->dpy, buf);
+
+   if (!va_check(status, "vaRenderPicture"))
+      return false;
+
+   status = vaEndPicture(dev->dpy, context_id);
+   return va_check(status, "vaEndPicture");
 }

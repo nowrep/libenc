@@ -43,6 +43,11 @@ bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *d
    return surface->export_dmabuf(dmabuf);
 }
 
+bool enc_surface_copy(struct enc_surface *input, struct enc_surface *output)
+{
+   return input->copy(output);
+}
+
 struct enc_encoder *enc_encoder_create(const struct enc_encoder_params *params)
 {
    std::unique_ptr<enc_encoder> encoder;

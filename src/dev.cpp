@@ -11,6 +11,10 @@ enc_dev::enc_dev()
 
 enc_dev::~enc_dev()
 {
+   if (proc_context_id != VA_INVALID_ID)
+      vaDestroyContext(dpy, proc_context_id);
+   if (proc_config_id != VA_INVALID_ID)
+      vaDestroyConfig(dpy, proc_config_id);
    if (fd != -1) {
       vaTerminate(dpy);
       close(fd);
@@ -51,4 +55,20 @@ bool enc_dev::create(const struct enc_dev_params *params)
    }
 
    return true;
+}
+
+VAContextID enc_dev::get_proc_context()
+{
+   if (proc_context_id != VA_INVALID_ID)
+      return proc_context_id;
+
+   VAStatus status = vaCreateConfig(dpy, VAProfileNone, VAEntrypointVideoProc, nullptr, 0, &proc_config_id);
+   if (!va_check(status, "vaCreateConfig"))
+      return VA_INVALID_ID;
+
+   status = vaCreateContext(dpy, proc_config_id, 0, 0, 0, nullptr, 0, &proc_context_id);
+   if (!va_check(status, "vaCreateContext"))
+      return VA_INVALID_ID;
+
+   return proc_context_id;
 }

@@ -11,6 +11,7 @@ Main focus of the library is low latency encoding, so features like B-frames are
 * Reference frame invalidation
 * Intra refresh
 * Dynamic rate control change
+* Format conversions (can use RGB as input)
 
 Tested with Mesa and Intel drivers. Mesa requires >= 24.3, older versions may not work.
 
@@ -68,6 +69,7 @@ More complex example can be found in `app` directory.
 
 ## TODO
 
-* Format conversion (take RGB as input)
 * Quality setting
 * Multiple slices
+* SVC headers with RC layers enabled
+* Query capabilities
