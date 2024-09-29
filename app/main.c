@@ -9,6 +9,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_drm.h>
+#include <libavutil/hwcontext_vaapi.h>
 
 AVFormatContext *av_ctx;
 AVCodecContext *av_codec_ctx;
@@ -16,6 +17,7 @@ int av_stream_idx;
 AVFrame *av_frame;
 AVFrame *av_drm_frame;
 enum AVPixelFormat av_fmt;
+VADisplay va_display = NULL;
 
 static int create_decoder(const char *device_path, const char *file_path)
 {
@@ -24,6 +26,10 @@ static int create_decoder(const char *device_path, const char *file_path)
       fprintf(stderr, "Failed to create hwdevice context %s\n", device_path);
       return 1;
    }
+
+   AVHWDeviceContext *vahwctx = (AVHWDeviceContext *)hw_dev_ctx->data;
+   AVVAAPIDeviceContext *vadevctx = vahwctx->hwctx;
+   va_display = vadevctx->display;
 
    if (avformat_open_input(&av_ctx, file_path, NULL, NULL) != 0) {
       fprintf(stderr, "Failed to open input %s\n", file_path);
@@ -346,7 +352,7 @@ int main(int argc, char *argv[])
    }
 
    struct enc_dev_params dev_params = {
-      .device_path = opt_device,
+      .va_display = va_display,
    };
    struct enc_dev *dev = enc_dev_create(&dev_params);
    if (!dev) {

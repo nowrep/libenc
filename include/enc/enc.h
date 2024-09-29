@@ -39,6 +39,9 @@ enum enc_frame_type {
 struct enc_dev_params {
    // Device path. Example /dev/dri/renderD128.
    const char *device_path;
+
+   // Existing VADisplay to use.
+   void *va_display;
 };
 
 struct enc_dev *enc_dev_create(const struct enc_dev_params *params);
