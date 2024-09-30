@@ -250,6 +250,14 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
 
    VAEncPictureParameterBufferH264 pic = {};
    pic.CurrPic.picture_id = dpb[enc_params.recon_slot].surface;
+   if (enc_params.long_term) {
+      pic.CurrPic.frame_idx = lt_num[enc_params.frame_id];
+      pic.CurrPic.flags = VA_PICTURE_H264_LONG_TERM_REFERENCE;
+   } else {
+      pic.CurrPic.frame_idx = enc_params.frame_id;
+   }
+   pic.CurrPic.TopFieldOrderCnt = pic_order_cnt;
+   pic.CurrPic.BottomFieldOrderCnt = pic_order_cnt;
    pic.coded_buf = task->buffer_id;
    pic.pic_parameter_set_id = pps.pic_parameter_set_id;
    pic.seq_parameter_set_id = pps.seq_parameter_set_id;
@@ -274,7 +282,13 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    }
    if (enc_params.ref_l0_slot != 0xff) {
       pic.ReferenceFrames[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
-      pic.ReferenceFrames[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
+      if (dpb[enc_params.ref_l0_slot].long_term) {
+         pic.ReferenceFrames[0].frame_idx = lt_num[dpb[enc_params.ref_l0_slot].frame_id];
+         pic.ReferenceFrames[0].flags = VA_PICTURE_H264_LONG_TERM_REFERENCE;
+      } else {
+         pic.ReferenceFrames[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
+         pic.ReferenceFrames[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+      }
       pic.ReferenceFrames[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
       pic.ReferenceFrames[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
    }
@@ -304,8 +318,13 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    }
    if (enc_params.ref_l0_slot != 0xff) {
       sl.RefPicList0[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
-      sl.RefPicList0[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
-      sl.RefPicList0[0].flags = dpb[enc_params.ref_l0_slot].long_term ? VA_PICTURE_H264_LONG_TERM_REFERENCE : VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+      if (dpb[enc_params.ref_l0_slot].long_term) {
+         sl.RefPicList0[0].frame_idx = lt_num[dpb[enc_params.ref_l0_slot].frame_id];
+         sl.RefPicList0[0].flags = VA_PICTURE_H264_LONG_TERM_REFERENCE;
+      } else {
+         sl.RefPicList0[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
+         sl.RefPicList0[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+      }
       sl.RefPicList0[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
       sl.RefPicList0[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
    }

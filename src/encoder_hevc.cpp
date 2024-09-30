@@ -219,7 +219,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
 
    VAEncPictureParameterBufferHEVC pic = {};
    pic.decoded_curr_pic.picture_id = dpb[enc_params.recon_slot].surface;
-   pic.decoded_curr_pic.flags = 0;
+   pic.decoded_curr_pic.pic_order_cnt = pic_order_cnt;
    pic.coded_buf = task->buffer_id;
    pic.collocated_ref_pic_index = sps.sps_temporal_mvp_enabled_flag ? 0 : 0xff;
    pic.pic_init_qp = pps.init_qp_minus26 + 26;
@@ -286,6 +286,8 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    if (enc_params.ref_l0_slot != 0xff) {
       sl.ref_pic_list0[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
       sl.ref_pic_list0[0].pic_order_cnt = dpb_poc[enc_params.ref_l0_slot];
+      if (dpb[enc_params.ref_l0_slot].long_term)
+         sl.ref_pic_list0[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
    add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
 
