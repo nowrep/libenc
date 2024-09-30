@@ -425,7 +425,6 @@ int main(int argc, char *argv[])
       fout = fopen(output, "w");
    }
 
-   uint64_t ref_num = 0;
    uint64_t frame_num = 0;
    uint64_t noref_frame = next_noref();
    uint64_t drop_frame = next_dropframe();
@@ -525,13 +524,10 @@ int main(int argc, char *argv[])
       }
       assert(enc_task_wait(task, UINT64_MAX));
 
-      if (feedback.referenced)
-         ref_num++;
-
       if (feedback.long_term)
          last_ltr_frame = feedback.frame_id;
 
-      if (drop_frame > 0 && drop_frame == ref_num) {
+      if (drop_frame > 0 && drop_frame == frame_num) {
          if (feedback.referenced)
             drop_frame = next_dropframe();
          if (opt_invalidate && feedback.referenced) {
