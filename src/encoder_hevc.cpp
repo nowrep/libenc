@@ -177,7 +177,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    slice.slice_temporal_mvp_enabled_flag = sps.sps_temporal_mvp_enabled_flag;
    slice.slice_sao_luma_flag = sps.sample_adaptive_offset_enabled_flag;
    slice.slice_sao_chroma_flag = sps.sample_adaptive_offset_enabled_flag;
-   slice.slice_qp_delta = params->qp - (pps.init_qp_minus26 + 26);
+   slice.slice_qp_delta = params->qp ? params->qp - (pps.init_qp_minus26 + 26) : 0;
    if (enc_params.ref_l0_slot != 0xff) {
       std::vector<uint64_t> ref_list0;
       std::vector<uint64_t> ltr_list;

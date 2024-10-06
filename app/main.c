@@ -438,7 +438,7 @@ int main(int argc, char *argv[])
 
    struct enc_frame_feedback feedback;
    struct enc_frame_params frame_params = {
-      .qp = opt_qp * codec_qp,
+      .qp = opt_rc == ENC_RATE_CONTROL_MODE_CQP ? opt_qp * codec_qp : 0,
       .feedback = &feedback,
    };
 

@@ -186,7 +186,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    slice.first_mb_in_slice = 0;
    slice.frame_num = enc_params.frame_id % (1 << (sps.log2_max_frame_num_minus4 + 4));
    slice.pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
-   slice.slice_qp_delta = params->qp - (pps.pic_init_qp_minus26 + 26);
+   slice.slice_qp_delta = params->qp ? params->qp - (pps.pic_init_qp_minus26 + 26) : 0;
    slice.ref_pic_list_modification_flag_l0 = 0;
    if (enc_params.ref_l0_slot != 0xff) {
       if (dpb[enc_params.ref_l0_slot].long_term) {
