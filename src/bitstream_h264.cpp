@@ -138,7 +138,7 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
    ue(slice.slice_type);
    ue(slice.pic_parameter_set_id);
    ui(slice.frame_num, sps.log2_max_frame_num_minus4 + 4);
-   if (slice.nal_ref_idc == 3)
+   if (slice.nal_unit_type == 5)
       ue(slice.idr_pic_id);
    if (sps.pic_order_cnt_type == 0)
       ui(slice.pic_order_cnt_lsb, sps.log2_max_pic_order_cnt_lsb_minus4 + 4);
@@ -183,7 +183,7 @@ void bitstream_h264::write_slice(const slice &slice, const sps &sps, const pps &
       }
    }
    if (slice.nal_ref_idc != 0) {
-      if (slice.nal_ref_idc == 3) {
+      if (slice.nal_unit_type == 5) {
          ui(slice.no_output_of_prior_pics_flag, 1);
          ui(slice.long_term_reference_flag, 1);
       } else {
