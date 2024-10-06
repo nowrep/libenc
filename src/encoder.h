@@ -69,6 +69,7 @@ struct enc_encoder
       bool available = false;
       VASurfaceID surface = VA_INVALID_SURFACE;
       uint64_t frame_id = 0;
+      uint32_t pic_order_cnt = 0;
       bool long_term = false;
       std::vector<uint64_t> refs;
 
@@ -80,6 +81,7 @@ struct enc_encoder
          valid = false;
          available = false;
          frame_id = 0;
+         pic_order_cnt = 0;
          long_term = false;
          refs.clear();
       }

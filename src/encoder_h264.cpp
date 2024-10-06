@@ -32,8 +32,6 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
    if (!create_context(params, attribs))
       return false;
 
-   dpb_poc.resize(dpb.size());
-
    sps.profile_idc = params->h264.profile;
    sps.constraint_set_flags = 0;
    sps.level_idc = params->h264.level;
@@ -92,7 +90,7 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       pic_order_cnt = 0;
    }
 
-   dpb_poc[enc_params.recon_slot] = pic_order_cnt;
+   dpb[enc_params.recon_slot].pic_order_cnt = pic_order_cnt;
 
    bitstream_h264 bs;
 
@@ -280,17 +278,29 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       pic.ReferenceFrames[i].picture_id = VA_INVALID_ID;
       pic.ReferenceFrames[i].flags = VA_PICTURE_H264_INVALID;
    }
-   if (enc_params.ref_l0_slot != 0xff) {
-      pic.ReferenceFrames[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
-      if (dpb[enc_params.ref_l0_slot].long_term) {
-         pic.ReferenceFrames[0].frame_idx = lt_num[dpb[enc_params.ref_l0_slot].frame_id];
-         pic.ReferenceFrames[0].flags = VA_PICTURE_H264_LONG_TERM_REFERENCE;
+   std::vector<dpb_entry> sorted_dpb;
+   std::copy_if(dpb.begin(), dpb.end(), std::back_inserter(sorted_dpb), [this](const auto &a) {
+      return a.ok() && a.frame_id != enc_params.frame_id;
+   });
+   std::sort(sorted_dpb.begin(), sorted_dpb.end(), [this](const auto &a, const auto &b) {
+      if (a.long_term != b.long_term)
+         return b.long_term;
+      if (a.long_term)
+         return lt_num[a.frame_id] < lt_num[b.frame_id];
+      else
+         return a.frame_id > b.frame_id;
+   });
+   for (uint32_t i = 0; i < sorted_dpb.size(); i++) {
+      pic.ReferenceFrames[i].picture_id = sorted_dpb[i].surface;
+      if (sorted_dpb[i].long_term) {
+         pic.ReferenceFrames[i].frame_idx = lt_num[sorted_dpb[i].frame_id];
+         pic.ReferenceFrames[i].flags = VA_PICTURE_H264_LONG_TERM_REFERENCE;
       } else {
-         pic.ReferenceFrames[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
-         pic.ReferenceFrames[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
+         pic.ReferenceFrames[i].frame_idx = sorted_dpb[i].frame_id;
+         pic.ReferenceFrames[i].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
       }
-      pic.ReferenceFrames[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
-      pic.ReferenceFrames[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
+      pic.ReferenceFrames[i].TopFieldOrderCnt = sorted_dpb[i].pic_order_cnt;
+      pic.ReferenceFrames[i].BottomFieldOrderCnt = sorted_dpb[i].pic_order_cnt;
    }
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
@@ -325,8 +335,8 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
          sl.RefPicList0[0].frame_idx = dpb[enc_params.ref_l0_slot].frame_id;
          sl.RefPicList0[0].flags = VA_PICTURE_H264_SHORT_TERM_REFERENCE;
       }
-      sl.RefPicList0[0].TopFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
-      sl.RefPicList0[0].BottomFieldOrderCnt = dpb_poc[enc_params.ref_l0_slot];
+      sl.RefPicList0[0].TopFieldOrderCnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
+      sl.RefPicList0[0].BottomFieldOrderCnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
    }
    add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
 

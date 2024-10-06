@@ -32,8 +32,6 @@ bool encoder_hevc::create(const struct enc_encoder_params *params)
    features.value = get_config_attrib(VAConfigAttribEncHEVCFeatures);
    block_sizes.value = get_config_attrib(VAConfigAttribEncHEVCBlockSizes);
 
-   dpb_poc.resize(dpb.size());
-
    bitstream_hevc::profile_tier_level ptl = {};
    ptl.profile_tier.general_profile_idc = params->hevc.profile;
    ptl.profile_tier.general_tier_flag = params->hevc.tier;
@@ -117,7 +115,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    if (is_idr)
       pic_order_cnt = 0;
 
-   dpb_poc[enc_params.recon_slot] = pic_order_cnt;
+   dpb[enc_params.recon_slot].pic_order_cnt = pic_order_cnt;
 
    bitstream_hevc bs;
 
@@ -184,11 +182,11 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       std::vector<uint64_t> ref_list0;
       std::vector<uint64_t> ltr_list;
       for (uint32_t i = 0; i < dpb.size(); i++) {
-         if (dpb[i].valid && dpb_poc[i] < pic_order_cnt) {
+         if (dpb[i].valid && dpb[i].pic_order_cnt < pic_order_cnt) {
             if (dpb[i].long_term)
-               ltr_list.push_back(dpb_poc[i]);
+               ltr_list.push_back(dpb[i].pic_order_cnt);
             else
-               ref_list0.push_back(dpb_poc[i]);
+               ref_list0.push_back(dpb[i].pic_order_cnt);
          }
       }
       std::sort(ltr_list.rbegin(), ltr_list.rend());
@@ -197,7 +195,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       for (uint32_t i = 0; i < ref_list0.size(); i++) {
          uint64_t ref_poc = ref_list0[i];
          sps.st_ref_pic_set[0].delta_poc_s0_minus1[i] = poc - ref_poc - 1;
-         sps.st_ref_pic_set[0].used_by_curr_pic_s0_flag[i] = ref_poc == dpb_poc[enc_params.ref_l0_slot];
+         sps.st_ref_pic_set[0].used_by_curr_pic_s0_flag[i] = ref_poc == dpb[enc_params.ref_l0_slot].pic_order_cnt;
          poc = ref_poc;
       }
       sps.st_ref_pic_set[0].num_negative_pics = ref_list0.size();
@@ -209,7 +207,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
          uint32_t ltr_lsb = ltr_poc % max_poc;
          uint32_t ltr_msb = ltr_poc - ltr_lsb;
          slice.poc_lsb_lt[i] = ltr_lsb;
-         slice.used_by_curr_pic_lt_flag[i] = ltr_poc == dpb_poc[enc_params.ref_l0_slot];
+         slice.used_by_curr_pic_lt_flag[i] = ltr_poc == dpb[enc_params.ref_l0_slot].pic_order_cnt;
          slice.delta_poc_msb_present_flag[i] = 1;
          slice.delta_poc_msb_cycle_lt[i] = (poc - ltr_msb) / max_poc;
          poc = ltr_poc;
@@ -248,11 +246,18 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       pic.reference_frames[i].picture_id = VA_INVALID_ID;
       pic.reference_frames[i].flags = VA_PICTURE_HEVC_INVALID;
    }
-   if (enc_params.ref_l0_slot != 0xff) {
-      pic.reference_frames[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
-      pic.reference_frames[0].pic_order_cnt = dpb_poc[enc_params.ref_l0_slot];
-      if (dpb[enc_params.ref_l0_slot].long_term)
-         pic.reference_frames[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
+   std::vector<dpb_entry> sorted_dpb;
+   std::copy_if(dpb.begin(), dpb.end(), std::back_inserter(sorted_dpb), [this](const auto &a) {
+      return a.ok() && a.frame_id != enc_params.frame_id;
+   });
+   std::sort(sorted_dpb.begin(), sorted_dpb.end(), [](const auto &a, const auto &b) {
+      return a.pic_order_cnt > b.pic_order_cnt;
+   });
+   for (uint32_t i = 0; i < sorted_dpb.size(); i++) {
+      pic.reference_frames[i].picture_id = sorted_dpb[i].surface;
+      pic.reference_frames[i].pic_order_cnt = sorted_dpb[i].pic_order_cnt;
+      if (sorted_dpb[i].long_term)
+         pic.reference_frames[i].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
@@ -285,7 +290,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    }
    if (enc_params.ref_l0_slot != 0xff) {
       sl.ref_pic_list0[0].picture_id = dpb[enc_params.ref_l0_slot].surface;
-      sl.ref_pic_list0[0].pic_order_cnt = dpb_poc[enc_params.ref_l0_slot];
+      sl.ref_pic_list0[0].pic_order_cnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
       if (dpb[enc_params.ref_l0_slot].long_term)
          sl.ref_pic_list0[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
