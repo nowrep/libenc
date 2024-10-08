@@ -528,15 +528,13 @@ int main(int argc, char *argv[])
          last_ltr_frame = feedback.frame_id;
 
       if (drop_frame > 0 && drop_frame == frame_num) {
-         if (feedback.referenced)
-            drop_frame = next_dropframe();
+         drop_frame = next_dropframe();
          if (opt_invalidate && feedback.referenced) {
             frame_params.num_invalidate_refs = 1;
             frame_params.invalidate_refs[0] = feedback.frame_id;
          }
       } else {
-         if (feedback.referenced)
-            frame_params.num_invalidate_refs = 0;
+         frame_params.num_invalidate_refs = 0;
          uint32_t size = 0;
          uint8_t *data = NULL;
          while (enc_task_get_bitstream(task, &size, &data))
