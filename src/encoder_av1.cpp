@@ -4,8 +4,8 @@
 encoder_av1::encoder_av1()
    : enc_encoder()
 {
-   unit_width = 1;
-   unit_height = 1;
+   unit_width = 64;
+   unit_height = 64;
 }
 
 bool encoder_av1::create(const struct enc_encoder_params *params)
@@ -19,6 +19,9 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
       return false;
       break;
    }
+
+   coded_width = params->width;
+   coded_height = params->height;
 
    std::vector<VAConfigAttrib> attribs;
    if (!create_context(params, attribs))
@@ -42,10 +45,10 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
       seq.seq_level_idx[i] = params->av1.level;
       seq.seq_tier[i] = params->av1.tier;
    }
-   seq.frame_width_bits_minus_1 = logbase2_ceil(aligned_width) - 1;
-   seq.frame_height_bits_minus_1 = logbase2_ceil(aligned_height) - 1;
-   seq.max_frame_width_minus_1 = aligned_width - 1;
-   seq.max_frame_height_minus_1 = aligned_height - 1;
+   seq.frame_width_bits_minus_1 = logbase2_ceil(coded_width) - 1;
+   seq.frame_height_bits_minus_1 = logbase2_ceil(coded_height) - 1;
+   seq.max_frame_width_minus_1 = coded_width - 1;
+   seq.max_frame_height_minus_1 = coded_height - 1;
    seq.high_bitdepth = params->bit_depth == 10;
    seq.chroma_sample_position = 1;
 
@@ -143,8 +146,8 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    pic.mode_control_flags.bits.tx_mode = frame.tx_mode_select ? 2 : 0;
    pic.tile_cols = 1;
    pic.tile_rows = 1;
-   pic.width_in_sbs_minus_1[0] = align(aligned_width, 64) / 64 - 1;
-   pic.height_in_sbs_minus_1[0] = align(aligned_height, 64) / 64 - 1;
+   pic.width_in_sbs_minus_1[0] = aligned_width / 64 - 1;
+   pic.height_in_sbs_minus_1[0] = aligned_height / 64 - 1;
    pic.tile_group_obu_hdr_info.bits.obu_has_size_field = 1;
    for (uint32_t i = 0; i < 8; i++)
       pic.reference_frames[i] = VA_INVALID_ID;

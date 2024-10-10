@@ -22,6 +22,8 @@ private:
    VAConfigAttribValEncAV1Ext1 features2;
    VAConfigAttribValEncAV1Ext2 features3;
 
+   uint32_t coded_width = 0;
+   uint32_t coded_height = 0;
    uint32_t ref_idx_slot = 0;
    std::vector<uint32_t> dpb_ref_idx;
 };
