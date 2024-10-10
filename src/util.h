@@ -35,3 +35,9 @@ static inline uint32_t logbase2_ceil(uint32_t v)
 {
    return ceil(log(v) / log(2.0));
 }
+
+template <typename T>
+static inline T div_round_up(T a, T b)
+{
+   return (a + b - 1) / b;
+}

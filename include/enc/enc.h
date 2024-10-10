@@ -153,6 +153,9 @@ struct enc_encoder_params {
    // Interval between IDR frames. 0 = infinite.
    uint32_t gop_size;
 
+   // Number of slices.
+   uint8_t num_slices;
+
    // Rate control mode.
    enum enc_rate_control_mode rc_mode;
 

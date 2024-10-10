@@ -172,7 +172,6 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
          slice.slice_type = 1;
    }
    slice.temporal_id = params->temporal_id;
-   slice.first_slice_segment_in_pic_flag = 1;
    slice.slice_pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
    slice.slice_temporal_mvp_enabled_flag = sps.sps_temporal_mvp_enabled_flag;
    slice.slice_sao_luma_flag = sps.sample_adaptive_offset_enabled_flag;
@@ -262,7 +261,6 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
    VAEncSliceParameterBufferHEVC sl = {};
-   sl.num_ctu_in_slice = (aligned_width / unit_width) * (aligned_height / unit_height);
    sl.slice_type = slice.slice_type;
    sl.slice_pic_parameter_set_id = slice.slice_pic_parameter_set_id;
    sl.num_ref_idx_l0_active_minus1 = slice.num_ref_idx_active_override_flag ? slice.num_ref_idx_l0_active_minus1 : pps.num_ref_idx_l0_default_active_minus1;
@@ -294,11 +292,22 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
       if (dpb[enc_params.ref_l0_slot].long_term)
          sl.ref_pic_list0[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
-   add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
 
-   bs.write_slice(slice, sps, pps);
-   add_packed_header(VAEncPackedHeaderSlice, bs);
-   bs.reset();
+   uint32_t total_size = (aligned_width / unit_width) * (aligned_height / unit_height);
+   uint32_t slice_size = div_round_up(total_size, num_slices);
+   for (uint32_t i = 0; i < num_slices; i++) {
+      slice.first_slice_segment_in_pic_flag = i == 0;
+      slice.slice_segment_address = i * slice_size;
+      sl.slice_segment_address = slice.slice_segment_address;
+      sl.num_ctu_in_slice = std::min(total_size, slice_size);
+      add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
+
+      bs.write_slice(slice, sps, pps);
+      add_packed_header(VAEncPackedHeaderSlice, bs);
+      bs.reset();
+
+      total_size -= slice_size;
+   }
 
    if (!end_encode(params))
       return {};

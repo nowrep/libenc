@@ -123,6 +123,8 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
    num_layers = params->num_rc_layers ? params->num_rc_layers : 1;
    update_rate_control(params->rc_params);
 
+   num_slices = std::max(static_cast<uint8_t>(1), params->num_slices);
+
    return true;
 }
 

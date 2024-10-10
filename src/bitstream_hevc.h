@@ -154,6 +154,7 @@ public:
       uint8_t first_slice_segment_in_pic_flag : 1;
       uint8_t no_output_of_prior_pics_flag : 1;
       uint8_t slice_pic_parameter_set_id;
+      uint32_t slice_segment_address;
       uint8_t slice_type;
       uint32_t pic_output_flag : 1;
       uint32_t slice_pic_order_cnt_lsb;

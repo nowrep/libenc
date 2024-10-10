@@ -47,6 +47,7 @@ struct enc_encoder
 
    uint32_t num_refs = 0;
    uint32_t num_layers = 0;
+   uint32_t num_slices = 0;
    uint32_t gop_size = 0;
    bool intra_refresh = false;
    bool low_latency = false;

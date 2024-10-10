@@ -200,8 +200,10 @@ void bitstream_hevc::write_slice(const slice &slice, const sps &sps, const pps &
    if (slice.nal_unit_type >= 16 && slice.nal_unit_type <= 23)
       ui(slice.no_output_of_prior_pics_flag, 1);
    ue(slice.slice_pic_parameter_set_id);
-   // if (!slice.first_slice_segment_in_pic_flag)
-      // ui(slice.slice_segment_address, v);
+   if (!slice.first_slice_segment_in_pic_flag) {
+      uint32_t size_in_ctbs = (sps.pic_width_in_luma_samples / 64) * (sps.pic_height_in_luma_samples / 64);
+      ui(slice.slice_segment_address, logbase2_ceil(size_in_ctbs));
+   }
    ue(slice.slice_type);
    if (pps.output_flag_present_flag)
       ui(slice.pic_output_flag, 1);

@@ -151,6 +151,7 @@ static int help(void)
    printf("  --qp QP                              Set QP, default = 22\n");
    printf("  --rc-layers NUM_LAYERS               Set number of rate control layers, default = 1\n");
    printf("  --hierarchy LEVEL                    Set reference hierarchy level, default = 1\n");
+   printf("  --slices NUM_SLICES                  Set number of slices, default = 1\n");
    printf("  --intra-refresh                      Enable intra refresh, default = false\n");
    printf("  --low-latency                        Enable low latency context, default = false\n");
    printf("\n");
@@ -182,6 +183,7 @@ static struct option long_options[] = {
    {"gradual-qp",       no_argument,       NULL, ':'},
    {"ltrframes",        required_argument, NULL, ':'},
    {"low-latency",      no_argument,       NULL, ':'},
+   {"slices",           required_argument, NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -203,6 +205,7 @@ uint8_t opt_hierarchy = 1;
 bool opt_gradual_qp = false;
 char *opt_ltrframes = NULL;
 bool opt_low_latency = false;
+uint8_t opt_slices = 1;
 
 int next_noref(void)
 {
@@ -328,6 +331,9 @@ int main(int argc, char *argv[])
       case 17:
          opt_low_latency = true;
          break;
+      case 18:
+         opt_slices = atoi(optarg);
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -379,6 +385,7 @@ int main(int argc, char *argv[])
       .height = dmabuf.height,
       .num_refs = opt_refs,
       .gop_size = opt_gop,
+      .num_slices = opt_slices,
       .rc_mode = opt_rc,
       .num_rc_layers = opt_rc_layers,
       .rc_params = rc_params,

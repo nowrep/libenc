@@ -183,7 +183,6 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       bs.reset();
    }
 
-   slice.first_mb_in_slice = 0;
    slice.frame_num = enc_params.frame_id % (1 << (sps.log2_max_frame_num_minus4 + 4));
    slice.pic_order_cnt_lsb = pic_order_cnt % (1 << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4));
    slice.slice_qp_delta = params->qp ? params->qp - (pps.pic_init_qp_minus26 + 26) : 0;
@@ -305,7 +304,6 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
    add_buffer(VAEncPictureParameterBufferType, sizeof(pic), &pic);
 
    VAEncSliceParameterBufferH264 sl = {};
-   sl.num_macroblocks = (aligned_width / unit_width) * (aligned_height / unit_height);
    sl.macroblock_info = VA_INVALID_ID;
    sl.slice_type = slice.slice_type;
    sl.pic_parameter_set_id = slice.pic_parameter_set_id;
@@ -338,11 +336,21 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       sl.RefPicList0[0].TopFieldOrderCnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
       sl.RefPicList0[0].BottomFieldOrderCnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
    }
-   add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
 
-   bs.write_slice(slice, sps, pps);
-   add_packed_header(VAEncPackedHeaderSlice, bs);
-   bs.reset();
+   uint32_t total_size = (aligned_width / unit_width) * (aligned_height / unit_height);
+   uint32_t slice_size = div_round_up(total_size, num_slices);
+   for (uint32_t i = 0; i < num_slices; i++) {
+      slice.first_mb_in_slice = i * slice_size;
+      sl.macroblock_address = slice.first_mb_in_slice;
+      sl.num_macroblocks = std::min(total_size, slice_size);
+      add_buffer(VAEncSliceParameterBufferType, sizeof(sl), &sl);
+
+      bs.write_slice(slice, sps, pps);
+      add_packed_header(VAEncPackedHeaderSlice, bs);
+      bs.reset();
+
+      total_size -= slice_size;
+   }
 
    if (!end_encode(params))
       return {};
