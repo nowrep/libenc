@@ -445,7 +445,6 @@ int main(int argc, char *argv[])
 
    struct enc_frame_feedback feedback;
    struct enc_frame_params frame_params = {
-      .qp = opt_rc == ENC_RATE_CONTROL_MODE_CQP ? opt_qp * codec_qp : 0,
       .feedback = &feedback,
    };
 
@@ -467,7 +466,7 @@ int main(int argc, char *argv[])
       frame_params.not_referenced = false;
       frame_params.long_term = false;
       frame_params.num_ref_list0 = 0;
-      frame_params.qp = qp;
+      frame_params.qp = opt_rc == ENC_RATE_CONTROL_MODE_CQP ? qp * codec_qp : 0;
 
       if (last_ltr_frame < feedback.frame_id) {
          frame_params.num_ref_list0 = 1;
