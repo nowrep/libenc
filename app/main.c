@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
    for (uint32_t i = 0; i < opt_rc_layers; i++) {
       rc_params[i].frame_rate = opt_fps / (1 << i);
       rc_params[i].bit_rate = opt_bitrate / (1 << i) * 1000;
-      rc_params[i].peak_bit_rate = opt_bitrate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1000.0 : 1500.0);
+      rc_params[i].peak_bit_rate = rc_params[i].bit_rate * (opt_rc == ENC_RATE_CONTROL_MODE_CBR ? 1.0 : 1.5);
       rc_params[i].vbv_buffer_size = opt_bitrate * 1000;
       rc_params[i].vbv_initial_fullness = opt_bitrate * 1000;
       rc_params[i].min_qp = 1;

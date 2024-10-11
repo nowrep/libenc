@@ -397,7 +397,7 @@ void enc_encoder::update_rate_control(const struct enc_rate_control_params *para
 
       VAEncMiscParameterRateControl rc = {};
       rc.bits_per_second = std::max(params[i].bit_rate, params[i].peak_bit_rate);
-      rc.target_percentage = (rc.bits_per_second * 100) / params[i].bit_rate;
+      rc.target_percentage = (params[i].bit_rate * 100) / rc.bits_per_second;
       rc.min_qp = params[i].min_qp;
       rc.max_qp = params[i].max_qp;
       rc.quality_factor = params[i].qvbr_quality;
