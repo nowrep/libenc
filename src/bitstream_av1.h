@@ -8,6 +8,7 @@ public:
    struct seq {
       uint8_t seq_profile;
       uint8_t still_picture : 1;
+      uint8_t reduced_still_picture_header : 1;
       uint8_t timing_info_present_flag : 1;
       uint32_t num_units_in_display_tick;
       uint32_t time_scale;

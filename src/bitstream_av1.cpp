@@ -16,39 +16,46 @@ void bitstream_av1::write_seq(const seq &seq)
    bitstream bs;
    bs.ui(seq.seq_profile, 3);
    bs.ui(seq.still_picture, 1);
-   bs.ui(0x0, 1); // reduced_still_picture_header
-   bs.ui(seq.timing_info_present_flag, 1);
-   if (seq.timing_info_present_flag) {
-      bs.ui(seq.num_units_in_display_tick, 32);
-      bs.ui(seq.time_scale, 32);
-      bs.ui(seq.equal_picture_interval, 1);
-      if (seq.equal_picture_interval)
-         bs.ue(seq.num_ticks_per_picture_minus_1);
-      bs.ui(0x0, 1); // decoder_model_info_present_flag
-   }
-   bs.ui(0x0, 1); // initial_display_delay_present_flag
-   bs.ui(seq.operating_points_cnt_minus_1, 5);
-   for (uint32_t i = 0; i <= seq.operating_points_cnt_minus_1; i++) {
-      bs.ui(seq.operating_point_idc[i], 12);
-      bs.ui(seq.seq_level_idx[i], 5);
-      if (seq.seq_level_idx[i] > 7)
-         bs.ui(seq.seq_tier[i], 1);
+   bs.ui(seq.reduced_still_picture_header, 1);
+   if (seq.reduced_still_picture_header) {
+      bs.ui(seq.seq_level_idx[0], 5);
+   } else {
+      bs.ui(seq.timing_info_present_flag, 1);
+      if (seq.timing_info_present_flag) {
+         bs.ui(seq.num_units_in_display_tick, 32);
+         bs.ui(seq.time_scale, 32);
+         bs.ui(seq.equal_picture_interval, 1);
+         if (seq.equal_picture_interval)
+            bs.ue(seq.num_ticks_per_picture_minus_1);
+         bs.ui(0x0, 1); // decoder_model_info_present_flag
+      }
+      bs.ui(0x0, 1); // initial_display_delay_present_flag
+      bs.ui(seq.operating_points_cnt_minus_1, 5);
+      for (uint32_t i = 0; i <= seq.operating_points_cnt_minus_1; i++) {
+         bs.ui(seq.operating_point_idc[i], 12);
+         bs.ui(seq.seq_level_idx[i], 5);
+         if (seq.seq_level_idx[i] > 7)
+            bs.ui(seq.seq_tier[i], 1);
+      }
    }
    bs.ui(seq.frame_width_bits_minus_1, 4);
    bs.ui(seq.frame_height_bits_minus_1, 4);
    bs.ui(seq.max_frame_width_minus_1, seq.frame_width_bits_minus_1 + 1);
    bs.ui(seq.max_frame_height_minus_1, seq.frame_height_bits_minus_1 + 1);
-   bs.ui(0x0, 1); // frame_id_numbers_present_flag
+   if (!seq.reduced_still_picture_header)
+      bs.ui(0x0, 1); // frame_id_numbers_present_flag
    bs.ui(seq.use_128x128_superblock, 1);
    bs.ui(seq.enable_filter_intra, 1);
    bs.ui(seq.enable_intra_edge_filter, 1);
-   bs.ui(seq.enable_interintra_compound, 1);
-   bs.ui(seq.enable_masked_compound, 1);
-   bs.ui(seq.enable_warped_motion, 1);
-   bs.ui(seq.enable_dual_filter, 1);
-   bs.ui(0x0, 1); // enable_order_hint
-   bs.ui(0x1, 1); // seq_choose_screen_content_tools
-   bs.ui(0x1, 1); // seq_choose_integer_mv
+   if (!seq.reduced_still_picture_header) {
+      bs.ui(seq.enable_interintra_compound, 1);
+      bs.ui(seq.enable_masked_compound, 1);
+      bs.ui(seq.enable_warped_motion, 1);
+      bs.ui(seq.enable_dual_filter, 1);
+      bs.ui(0x0, 1); // enable_order_hint
+      bs.ui(0x1, 1); // seq_choose_screen_content_tools
+      bs.ui(0x1, 1); // seq_choose_integer_mv
+   }
    bs.ui(0x0, 1); // enable_superres
    bs.ui(seq.enable_cdef, 1);
    bs.ui(0x0, 1); // enable_restoration
@@ -80,18 +87,20 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
    frame_offsets off = {};
 
    bitstream bs;
-   bs.ui(0x0, 1); // show_existing_frame
-   bs.ui(frame.frame_type, 2);
-   bs.ui(frame.show_frame, 1);
-   if (!frame.show_frame)
-      bs.ui(frame.showable_frame, 1);
-   if (frame.frame_type == 3 || (frame.frame_type == 0 && frame.show_frame))
-      error_resilient_mode = true;
-   else
-      bs.ui(error_resilient_mode, 1);
+   if (!seq.reduced_still_picture_header) {
+      bs.ui(0x0, 1); // show_existing_frame
+      bs.ui(frame.frame_type, 2);
+      bs.ui(frame.show_frame, 1);
+      if (!frame.show_frame)
+         bs.ui(frame.showable_frame, 1);
+      if (frame.frame_type == 3 || (frame.frame_type == 0 && frame.show_frame))
+         error_resilient_mode = true;
+      else
+         bs.ui(error_resilient_mode, 1);
+   }
    bs.ui(frame.disable_cdf_update, 1);
    bs.ui(0x0, 1); // allow_screen_content_tools
-   if (frame.frame_type != 3)
+   if (frame.frame_type != 3 && !seq.reduced_still_picture_header)
       bs.ui(0x0, 1); // frame_size_override_flag
    if (!frame_is_intra && !error_resilient_mode)
       bs.ui(frame.primary_ref_frame, 3);
@@ -110,7 +119,7 @@ bitstream_av1::frame_offsets bitstream_av1::write_frame(const frame &frame, cons
          bs.ui(frame.interpolation_filter, 2);
       bs.ui(frame.is_motion_mode_switchable, 1);
    }
-   if (!frame.disable_cdf_update)
+   if (!seq.reduced_still_picture_header && !frame.disable_cdf_update)
       bs.ui(frame.disable_frame_end_update_cdf, 1);
    bs.ui(frame.uniform_tile_spacing_flag, 1);
    bs.ui(0x0, 1); // increment_tile_cols_log2
