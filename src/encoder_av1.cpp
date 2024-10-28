@@ -33,6 +33,8 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
 
    dpb_ref_idx.resize(dpb.size());
 
+   seq.still_picture = 1;
+   seq.reduced_still_picture_header = 1;
    seq.seq_profile = params->av1.profile;
    seq.timing_info_present_flag = 1;
    auto framerate = get_framerate(params->rc_params[0].frame_rate);
@@ -50,7 +52,7 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
    seq.max_frame_width_minus_1 = coded_width - 1;
    seq.max_frame_height_minus_1 = coded_height - 1;
    seq.high_bitdepth = params->bit_depth == 10;
-   seq.chroma_sample_position = 1;
+   seq.chroma_sample_position = 0;
 
    return true;
 }
