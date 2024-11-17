@@ -294,7 +294,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    }
 
    uint32_t total_size = (aligned_width / unit_width) * (aligned_height / unit_height);
-   uint32_t slice_size = div_round_up(total_size, num_slices);
+   uint32_t slice_size = align_npot(div_round_up(total_size, num_slices), aligned_width / unit_width);
    for (uint32_t i = 0; i < num_slices; i++) {
       slice.first_slice_segment_in_pic_flag = i == 0;
       slice.slice_segment_address = i * slice_size;

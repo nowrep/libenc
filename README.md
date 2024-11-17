@@ -13,6 +13,7 @@ Main focus of the library is low latency encoding, so features like B-frames are
 * Dynamic rate control change
 * Format and color conversion
 * SVC Temporal with rate control layers
+* Multiple slices
 
 Tested with Mesa and Intel drivers. Mesa requires >= 24.3, older versions may not work.
 
@@ -71,5 +72,4 @@ More complex example can be found in `app` directory.
 ## TODO
 
 * Quality setting
-* Multiple slices
 * Query capabilities

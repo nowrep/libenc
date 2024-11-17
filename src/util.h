@@ -20,6 +20,12 @@ static inline T align(T x, uint32_t a)
    return (x + a - 1) & ~(a - 1);
 }
 
+template <typename T>
+static inline T align_npot(T x, uint32_t a)
+{
+   return x % a ? x + (a - (x % a)) : x;
+}
+
 static inline std::pair<uint32_t, uint32_t> get_framerate(float fps)
 {
    uint32_t num = fps;
