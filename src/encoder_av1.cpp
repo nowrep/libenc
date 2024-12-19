@@ -4,8 +4,7 @@
 encoder_av1::encoder_av1()
    : enc_encoder()
 {
-   unit_width = 64;
-   unit_height = 64;
+   unit_size = 64;
 }
 
 bool encoder_av1::create(const struct enc_encoder_params *params)

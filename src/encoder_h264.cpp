@@ -6,8 +6,7 @@
 encoder_h264::encoder_h264()
    : enc_encoder()
 {
-   unit_width = 16;
-   unit_height = 16;
+   unit_size = 16;
 }
 
 bool encoder_h264::create(const struct enc_encoder_params *params)
@@ -42,8 +41,8 @@ bool encoder_h264::create(const struct enc_encoder_params *params)
    sps.pic_order_cnt_type = 2;
    sps.log2_max_pic_order_cnt_lsb_minus4 = 4;
    sps.max_num_ref_frames = num_refs;
-   sps.pic_width_in_mbs_minus1 = (aligned_width / unit_width) - 1;
-   sps.pic_height_in_map_units_minus1 = (aligned_height / unit_height) - 1;
+   sps.pic_width_in_mbs_minus1 = (aligned_width / unit_size) - 1;
+   sps.pic_height_in_map_units_minus1 = (aligned_height / unit_size) - 1;
    sps.frame_mbs_only_flag = 1;
    sps.direct_8x8_inference_flag = 1;
    if (aligned_width != params->width || aligned_height != params->height) {
@@ -337,8 +336,8 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       sl.RefPicList0[0].BottomFieldOrderCnt = dpb[enc_params.ref_l0_slot].pic_order_cnt;
    }
 
-   uint32_t total_size = (aligned_width / unit_width) * (aligned_height / unit_height);
-   uint32_t slice_size = align_npot(div_round_up(total_size, num_slices), aligned_width / unit_width);
+   uint32_t total_size = (aligned_width / unit_size) * (aligned_height / unit_size);
+   uint32_t slice_size = align_npot(div_round_up(total_size, num_slices), aligned_width / unit_size);
    for (uint32_t i = 0; i < num_slices; i++) {
       slice.first_mb_in_slice = i * slice_size;
       sl.macroblock_address = slice.first_mb_in_slice;

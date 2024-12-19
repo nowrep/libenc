@@ -6,8 +6,7 @@
 encoder_hevc::encoder_hevc()
    : enc_encoder()
 {
-   unit_width = 64;
-   unit_height = 64;
+   unit_size = 64;
 }
 
 bool encoder_hevc::create(const struct enc_encoder_params *params)
@@ -293,8 +292,10 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
          sl.ref_pic_list0[0].flags = VA_PICTURE_HEVC_LONG_TERM_REFERENCE;
    }
 
-   uint32_t total_size = (aligned_width / unit_width) * (aligned_height / unit_height);
-   uint32_t slice_size = align_npot(div_round_up(total_size, num_slices), aligned_width / unit_width);
+   uint32_t unit_width = div_round_up(aligned_width, unit_size);
+   uint32_t unit_height = div_round_up(aligned_height, unit_size);
+   uint32_t total_size = unit_width * unit_height;
+   uint32_t slice_size = align_npot(div_round_up(total_size, num_slices), unit_width);
    for (uint32_t i = 0; i < num_slices; i++) {
       slice.first_slice_segment_in_pic_flag = i == 0;
       slice.slice_segment_address = i * slice_size;

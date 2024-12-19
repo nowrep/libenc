@@ -37,8 +37,7 @@ struct enc_encoder
    VAProfile profile = {};
    VAEntrypoint entrypoint = {};
    uint32_t rt_format = 0;
-   uint32_t unit_width = 0;
-   uint32_t unit_height = 0;
+   uint32_t unit_size = 0;
    uint32_t aligned_width = 0;
    uint32_t aligned_height = 0;
    uint32_t codedbuf_size = 0;

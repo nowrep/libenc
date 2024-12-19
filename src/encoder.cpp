@@ -26,12 +26,9 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
 {
    dpy = params->dev->dpy;
 
-   aligned_width = align(params->width, unit_width);
-   aligned_height = align(params->height, unit_height);
-
    if (params->intra_refresh) {
       intra_refresh = true;
-      gop_size = std::min(params->gop_size, aligned_width / unit_width);
+      gop_size = std::min(params->gop_size, aligned_width / unit_size);
    } else {
       gop_size = params->gop_size;
    }
@@ -105,6 +102,25 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
    VAStatus status = vaCreateConfig(dpy, profile, entrypoint, attribs.data(), attribs.size(), &config_id);
    if (!va_check(status, "vaCreateConfig"))
       return false;
+
+   uint32_t num_attribs = 0;
+   vaQuerySurfaceAttributes(dpy, config_id, nullptr, &num_attribs);
+   std::vector<VASurfaceAttrib> surf_attribs(num_attribs);
+   vaQuerySurfaceAttributes(dpy, config_id, surf_attribs.data(), &num_attribs);
+   for (VASurfaceAttrib &attrib : surf_attribs) {
+      if (attrib.type == VASurfaceAttribAlignmentSize) {
+         VASurfaceAttribAlignmentStruct alignment;
+         alignment.value = attrib.value.value.i;
+         aligned_width = align(params->width, 1 << alignment.bits.log2_width_alignment);
+         aligned_height = align(params->height, 1 << alignment.bits.log2_height_alignment);
+         break;
+      }
+   }
+
+   if (!aligned_width || !aligned_height) {
+      aligned_width = align(params->width, unit_size);
+      aligned_height = align(params->height, unit_size);
+   }
 
    status = vaCreateContext(dpy, config_id, aligned_width, aligned_height, VA_PROGRESSIVE, nullptr, 0, &context_id);
    if (!va_check(status, "vaCreateContext"))
@@ -422,7 +438,7 @@ void enc_encoder::update_intra_refresh()
 {
    VAEncMiscParameterRIR rir = {};
    rir.rir_flags.bits.enable_rir_column = 1;
-   rir.intra_insert_size = aligned_width / unit_width / gop_size;
+   rir.intra_insert_size = aligned_width / unit_size / gop_size;
    rir.intra_insertion_location = (enc_params.gop_count % gop_size) * rir.intra_insert_size;
    add_misc_buffer(VAEncMiscParameterTypeRIR, sizeof(rir), &rir);
 }
