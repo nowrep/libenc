@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -523,12 +524,19 @@ int main(int argc, char *argv[])
          frame_params.long_term = true;
       }
 
+      struct timespec ts;
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+
       struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
       if (!task) {
          fprintf(stderr, "Failed to issue encode\n");
          return 2;
       }
       assert(enc_task_wait(task, UINT64_MAX));
+
+      struct timespec ts2;
+      clock_gettime(CLOCK_MONOTONIC, &ts2);
+      double elapsed = (ts2.tv_sec - ts.tv_sec) * 1e3 + (ts2.tv_nsec - ts.tv_nsec) / 1e6;
 
       if (feedback.long_term)
          last_ltr_frame = feedback.frame_id;
@@ -561,7 +569,7 @@ int main(int argc, char *argv[])
       }
 
       if (!quiet) {
-         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u ...", frame_num, feedback.frame_id, feedback.referenced, hierarchy_level);
+         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u time=%.1f ms ...", frame_num, feedback.frame_id, feedback.referenced, hierarchy_level, elapsed);
          fflush(stderr);
       }
 
