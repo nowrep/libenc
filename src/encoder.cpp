@@ -26,13 +26,6 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
 {
    dpy = params->dev->dpy;
 
-   if (params->intra_refresh) {
-      intra_refresh = true;
-      gop_size = std::min(params->gop_size, aligned_width / unit_size);
-   } else {
-      gop_size = params->gop_size;
-   }
-
    initial_bit_rate = params->rc_params[0].bit_rate;
 
    int32_t num_entrypoints = 0;
@@ -135,6 +128,13 @@ bool enc_encoder::create_context(const struct enc_encoder_params *params, std::v
    }
 
    codedbuf_size = aligned_width * aligned_height * 3 + (1 << 16);
+
+   if (params->intra_refresh) {
+      intra_refresh = true;
+      gop_size = std::min(params->gop_size, aligned_width / unit_size);
+   } else {
+      gop_size = params->gop_size;
+   }
 
    num_layers = params->num_rc_layers ? params->num_rc_layers : 1;
    update_rate_control(params->rc_params);
