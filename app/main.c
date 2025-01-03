@@ -589,7 +589,10 @@ int main(int argc, char *argv[])
       }
 
       if (!quiet) {
-         fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u time=%.1f ms ...", frame_num, feedback.frame_id, feedback.referenced, hierarchy_level, elapsed);
+         fprintf(stderr, "%sFrame = %"PRIu64" (%"PRIu64") ref=%u level=%u time=%.1f ms%s",
+                 isatty(2) ? "\r " : "",
+                 frame_num, feedback.frame_id, feedback.referenced, hierarchy_level, elapsed,
+                 isatty(2) ? " ..." : "\n");
          fflush(stderr);
       }
 
