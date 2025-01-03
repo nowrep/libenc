@@ -162,6 +162,7 @@ static int help(void)
    printf("  --dropframes FRAMES                  List of comma separated frames to drop in output\n");
    printf("  --no-invalidate                      Don't invalidate dropped frames\n");
    printf("  --gradual-qp                         Gradually change QP\n");
+   printf("  --sleep TIME                         Sleep for time (in ms) after each frame\n");
    return 1;
 }
 
@@ -185,6 +186,7 @@ static struct option long_options[] = {
    {"ltrframes",        required_argument, NULL, ':'},
    {"low-latency",      no_argument,       NULL, ':'},
    {"slices",           required_argument, NULL, ':'},
+   {"sleep",            required_argument, NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -207,6 +209,7 @@ bool opt_gradual_qp = false;
 char *opt_ltrframes = NULL;
 bool opt_low_latency = false;
 uint8_t opt_slices = 1;
+uint32_t opt_sleep = 0;
 
 int next_noref(void)
 {
@@ -334,6 +337,9 @@ int main(int argc, char *argv[])
          break;
       case 18:
          opt_slices = atoi(optarg);
+         break;
+      case 19:
+         opt_sleep = atoi(optarg);
          break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
@@ -572,6 +578,9 @@ int main(int argc, char *argv[])
          fprintf(stderr, "\r Frame = %"PRIu64" (%"PRIu64") ref=%u level=%u time=%.1f ms ...", frame_num, feedback.frame_id, feedback.referenced, hierarchy_level, elapsed);
          fflush(stderr);
       }
+
+      if (opt_sleep)
+         usleep(opt_sleep * 1000);
 
       frame_num++;
    } while (decode_frame(&dmabuf) && frame_num < opt_maxframes);
