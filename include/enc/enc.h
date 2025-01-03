@@ -95,7 +95,7 @@ void enc_surface_destroy(struct enc_surface *surface);
 bool enc_surface_export_dmabuf(struct enc_surface *surface, struct enc_dmabuf *dmabuf);
 
 // Copy surface, performing format and color conversion if needed.
-bool enc_surface_copy(struct enc_surface *input, struct enc_surface *output);
+bool enc_surface_copy(struct enc_surface *dst, struct enc_surface *src);
 
 struct enc_rate_control_params {
    // Frame rate.
