@@ -163,6 +163,7 @@ static int help(void)
    printf("  --no-invalidate                      Don't invalidate dropped frames\n");
    printf("  --gradual-qp                         Gradually change QP\n");
    printf("  --sleep TIME                         Sleep for time (in ms) after each frame\n");
+   printf("  --copy                               Copy decoded surface\n");
    return 1;
 }
 
@@ -187,6 +188,7 @@ static struct option long_options[] = {
    {"low-latency",      no_argument,       NULL, ':'},
    {"slices",           required_argument, NULL, ':'},
    {"sleep",            required_argument, NULL, ':'},
+   {"copy",             no_argument,       NULL, ':'},
    {NULL, 0, NULL, 0},
 };
 
@@ -210,6 +212,7 @@ char *opt_ltrframes = NULL;
 bool opt_low_latency = false;
 uint8_t opt_slices = 1;
 uint32_t opt_sleep = 0;
+bool opt_copy = false;
 
 int next_noref(void)
 {
@@ -341,6 +344,9 @@ int main(int argc, char *argv[])
       case 19:
          opt_sleep = atoi(optarg);
          break;
+      case 20:
+         opt_copy = true;
+         break;
       default:
          fprintf(stderr, "Unhandled option %d\n", option_index);
          return 1;
@@ -467,6 +473,14 @@ int main(int argc, char *argv[])
       if (!surf) {
          fprintf(stderr, "Failed to import dmabuf\n");
          return 2;
+      }
+
+      if (opt_copy) {
+         surface_params.dmabuf = NULL;
+         struct enc_surface *copy = enc_surface_create(&surface_params);
+         enc_surface_copy(copy, surf);
+         enc_surface_destroy(surf);
+         surf = copy;
       }
 
       frame_params.surface = surf;
