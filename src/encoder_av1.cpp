@@ -44,8 +44,8 @@ bool encoder_av1::create(const struct enc_encoder_params *params)
       seq.seq_level_idx[i] = params->av1.level;
       seq.seq_tier[i] = params->av1.tier;
    }
-   seq.frame_width_bits_minus_1 = logbase2_ceil(coded_width) - 1;
-   seq.frame_height_bits_minus_1 = logbase2_ceil(coded_height) - 1;
+   seq.frame_width_bits_minus_1 = logbase2(coded_width);
+   seq.frame_height_bits_minus_1 = logbase2(coded_height);
    seq.max_frame_width_minus_1 = coded_width - 1;
    seq.max_frame_height_minus_1 = coded_height - 1;
    seq.high_bitdepth = params->bit_depth == 10;
