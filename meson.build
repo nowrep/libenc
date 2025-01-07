@@ -46,3 +46,5 @@ libenc_dep = declare_dependency(
 if get_option('test-app').enabled()
   subdir('app')
 endif
+
+subdir('src/mfx')
