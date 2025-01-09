@@ -13,6 +13,8 @@
 #include <xf86drm.h>
 
 static const mfxChar *g_functions[] = {
+   "MFXClose",
+   "MFXVideoCORE_GetHandle",
    "MFXQueryIMPL",
    "MFXQueryVersion",
    "MFXVideoCORE_SetHandle",
@@ -106,7 +108,7 @@ static std::unique_ptr<impl_description> query_impl_va(VADisplay dpy, mfxU32 id)
    impl->Version.Version = MFX_STRUCT_VERSION(1, 0);
    impl->Impl = MFX_IMPL_TYPE_HARDWARE;
    impl->AccelerationMode = MFX_ACCEL_MODE_VIA_VAAPI;
-   impl->ApiVersion = { { 0, 2 } };
+   impl->ApiVersion = { { VERSION_MINOR, VERSION_MAJOR } };
    snprintf(impl->ImplName, sizeof(impl->ImplName), "libenc");
    snprintf(impl->License, sizeof(impl->License), "MIT License");
 

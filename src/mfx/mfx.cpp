@@ -1,30 +1,10 @@
 #define ONEVPL_EXPERIMENTAL
 #include <vpl/mfxvideo.h>
-#include <va/va.h>
-#include <enc/enc.h>
-#include "../surface.h"
 
-#include <memory.h>
 #include <iostream>
 
 #include "caps.h"
-
-class Session
-{
-public:
-   VADisplay dpy = nullptr;
-   mfxVideoParam param;
-
-   struct enc_dev *dev = nullptr;
-   struct enc_encoder *enc = nullptr;
-};
-
-class SyncPoint
-{
-public:
-   mfxBitstream *bs = nullptr;
-   struct enc_task *task = nullptr;
-};
+#include "session.h"
 
 extern "C"
 {
@@ -45,8 +25,8 @@ mfxStatus MFXInitEx(mfxInitParam par, mfxSession *session)
 
 mfxStatus MFXClose(mfxSession session)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   delete Session::from_mfx(session);
+   return MFX_ERR_NONE;
 }
 
 mfxStatus MFXJoinSession(mfxSession session, mfxSession child)
@@ -57,24 +37,18 @@ mfxStatus MFXJoinSession(mfxSession session, mfxSession child)
 
 mfxStatus MFXVideoCORE_GetHandle(mfxSession session, mfxHandleType type, mfxHDL *hdl)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return Session::from_mfx(session)->GetHandle(type, hdl);
 }
 
-mfxStatus MFXQueryIMPL(mfxSession session, mfxIMPL *impl)
+mfxStatus MFXQueryIMPL(mfxSession, mfxIMPL *impl)
 {
-   std::cout << __FUNCTION__ << std::endl;
    *impl = MFX_IMPL_HARDWARE;
    return MFX_ERR_NONE;
 }
 
-mfxStatus MFXQueryVersion(mfxSession session, mfxVersion *version)
+mfxStatus MFXQueryVersion(mfxSession, mfxVersion *version)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   *version = mfxVersion {
-      .Minor = 0,
-      .Major = 2,
-   };
+   *version = { { VERSION_MINOR, VERSION_MAJOR } };
    return MFX_ERR_NONE;
 }
 
@@ -86,141 +60,42 @@ mfxStatus MFXVideoCORE_SetFrameAllocator(mfxSession session, mfxFrameAllocator *
 
 mfxStatus MFXVideoCORE_SetHandle(mfxSession session, mfxHandleType type, mfxHDL hdl)
 {
-   std::cout << __FUNCTION__ << " " << type << std::endl;
-
-   Session *s = reinterpret_cast<Session*>(session);
-
-   switch (type) {
-   case MFX_HANDLE_VA_DISPLAY: {
-      struct enc_dev_params dev_params = {
-         .va_display = hdl,
-      };
-      s->dpy = hdl;
-      s->dev = enc_dev_create(&dev_params);
-      if (!s->dev)
-         return MFX_ERR_DEVICE_FAILED;
-      break;
-                               }
-   case MFX_HANDLE_VA_CONFIG_ID:
-   case MFX_HANDLE_VA_CONTEXT_ID:
-   default:
-      return MFX_ERR_UNKNOWN;
-   }
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->SetHandle(type, hdl);
 }
 
 mfxStatus MFXVideoCORE_SyncOperation(mfxSession session, mfxSyncPoint syncp, mfxU32 wait)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   SyncPoint *sp = reinterpret_cast<SyncPoint*>(syncp);
-
-   if (!enc_task_wait(sp->task, wait * 1000))
-      return MFX_WRN_IN_EXECUTION;
-
-   uint32_t size = 0;
-   uint8_t *data = NULL;
-
-   uint8_t *out = sp->bs->Data;
-   sp->bs->DataLength = 0;
-
-   while (enc_task_get_bitstream(sp->task, &size, &data)) {
-      memcpy(out, data, size);
-      out += size;
-      sp->bs->DataLength += size;
-   }
-
-   enc_task_destroy(sp->task);
-   sp->task = nullptr;
-   // delete sp;
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->SyncOperation(syncp, wait);
 }
 
 mfxStatus MFXVideoENCODE_Query(mfxSession session, mfxVideoParam *in, mfxVideoParam *out)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->Query(in, out);
 }
 
 mfxStatus MFXVideoENCODE_QueryIOSurf(mfxSession session, mfxVideoParam *par, mfxFrameAllocRequest *request)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   request->NumFrameSuggested = par->AsyncDepth + 4;
-   request->Type |= MFX_MEMTYPE_FROM_ENCODE | MFX_MEMTYPE_SYSTEM_MEMORY;
-   request->Info = par->mfx.FrameInfo;
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->QueryIOSurf(par, request);
 }
 
 mfxStatus MFXVideoENCODE_Init(mfxSession session, mfxVideoParam *par)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   Session *s = reinterpret_cast<Session*>(session);
-   s->param = *par;
-
-   struct enc_rate_control_params rc = {
-      .frame_rate = 30.0,
-      .bit_rate = 10000,
-      .vbv_buffer_size = 1000,
-   };
-
-   struct enc_encoder_params encoder_params = {
-      .dev = s->dev,
-      .codec = ENC_CODEC_H264,
-      .width = s->param.mfx.FrameInfo.CropW,
-      .height = s->param.mfx.FrameInfo.CropH,
-      .bit_depth = 8,
-      .num_refs = 1,
-      .gop_size = s->param.mfx.GopRefDist,
-      .num_slices = 1,
-      .rc_mode = ENC_RATE_CONTROL_MODE_CQP,
-      .num_rc_layers = 1,
-      .rc_params = &rc,
-      .h264 = {
-         .profile = ENC_H264_PROFILE_HIGH,
-         .level = 52,
-      },
-   };
-
-   s->enc = enc_encoder_create(&encoder_params);
-   if (!s->enc)
-      return MFX_ERR_DEVICE_FAILED;
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->Init(par);
 }
 
 mfxStatus MFXVideoENCODE_Reset(mfxSession session, mfxVideoParam *par)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   Session *s = reinterpret_cast<Session*>(session);
-
-   if (s->enc) {
-      enc_encoder_destroy(s->enc);
-      s->enc = nullptr;
-   }
-
-   return MFX_ERR_UNKNOWN;
+   return Session::from_mfx(session)->Reset(par);
 }
 
 mfxStatus MFXVideoENCODE_Close(mfxSession session)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->Close();
 }
 
 mfxStatus MFXVideoENCODE_GetVideoParam(mfxSession session, mfxVideoParam *par)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   Session *s = reinterpret_cast<Session*>(session);
-   *par = s->param;
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->GetVideoParam(par);
 }
 
 mfxStatus MFXVideoENCODE_GetEncodeStat(mfxSession session, mfxEncodeStat *stat)
@@ -231,65 +106,7 @@ mfxStatus MFXVideoENCODE_GetEncodeStat(mfxSession session, mfxEncodeStat *stat)
 
 mfxStatus MFXVideoENCODE_EncodeFrameAsync(mfxSession session, mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surface, mfxBitstream *bs, mfxSyncPoint *syncp)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   if (!surface) {
-      printf("flush\n");
-      return MFX_ERR_MORE_DATA;
-   }
-
-
-   Session *s = reinterpret_cast<Session*>(session);
-
-   struct enc_surface_params surface_params = {
-      .dev = s->dev,
-      .format = ENC_FORMAT_NV12,
-      .width = surface->Info.Width,
-      .height = surface->Info.Height,
-   };
-   struct enc_surface *surf = enc_surface_create(&surface_params);
-
-   enc_surface *su = reinterpret_cast<enc_surface*>(surf);
-
-   VAImage image;
-   vaDeriveImage(s->dpy, su->surface_id, &image);
-
-   uint8_t *data;
-   vaMapBuffer2(s->dpy, image.buf, reinterpret_cast<void**>(&data), VA_MAPBUFFER_FLAG_WRITE);
-
-   for (uint32_t i = 0; i < surface->Info.Height; i++)
-      memcpy(data + i * image.pitches[0], surface->Data.Y + i * surface->Data.Pitch, surface->Data.Pitch);
-
-   for (uint32_t i = 0; i < surface->Info.Height / 2; i++)
-      memcpy(data + image.offsets[1] + i * image.pitches[1], surface->Data.UV + i * surface->Data.Pitch, surface->Data.Pitch);
-
-   vaUnmapBuffer(s->dpy, image.buf);
-   vaDestroyImage(s->dpy, image.image_id);
-
-   // TODO COPY
-
-   struct enc_frame_feedback feedback;
-   struct enc_frame_params frame_params = {
-      .feedback = &feedback,
-   };
-
-   frame_params.surface = surf;
-   frame_params.qp = 20;
-
-   struct enc_task *task = enc_encoder_encode_frame(s->enc, &frame_params);
-
-   enc_surface_destroy(surf);
-
-   if (!task)
-      return MFX_ERR_DEVICE_LOST;
-
-   SyncPoint *sp = new SyncPoint;
-   sp->task = task;
-   sp->bs = bs;
-
-   *syncp = reinterpret_cast<mfxSyncPoint>(sp);
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->EncodeFrameAsync(ctrl, surface, bs, syncp);
 }
 
 mfxStatus MFXVideoDECODE_Query(mfxSession session, mfxVideoParam *in, mfxVideoParam *out)
@@ -426,11 +243,7 @@ mfxStatus MFXGetPriority(mfxSession session, mfxPriority *priority)
 
 mfxStatus MFXVideoCORE_QueryPlatform(mfxSession session, mfxPlatform* platform)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   platform->MediaAdapterType = MFX_MEDIA_DISCRETE;
-
-   return MFX_ERR_NONE;
+   return Session::from_mfx(session)->QueryPlatform(platform);
 }
 
 // 2.0
@@ -464,9 +277,8 @@ mfxStatus MFXMemory_GetSurfaceForDecode(mfxSession session, mfxFrameSurface1** s
 
 mfxStatus MFXInitialize(mfxInitializationParam par, mfxSession *session)
 {
-   std::cout << __FUNCTION__ << std::endl;
-
-   *session = reinterpret_cast<mfxSession>(new Session);
+   Session *s = new Session(par);
+   *session = s->to_mfx();
    return MFX_ERR_NONE;
 }
 

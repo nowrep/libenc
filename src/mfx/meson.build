@@ -4,6 +4,7 @@ libdrm = dependency('libdrm')
 files_libmfx = files(
   'mfx.cpp',
   'caps.cpp',
+  'session.cpp',
 )
 
 libmfx = library(
