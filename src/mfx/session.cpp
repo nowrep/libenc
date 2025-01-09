@@ -113,6 +113,11 @@ mfxStatus Session::Init(mfxVideoParam *par)
 
    param = *par;
 
+   if (!param.mfx.BRCParamMultiplier)
+      param.mfx.BRCParamMultiplier = 1;
+   if (!param.mfx.BufferSizeInKB)
+      param.mfx.BufferSizeInKB = 1024;
+
    if (!dev) {
       struct enc_dev_params params = {};
       params.device_path = dev_path.c_str();
@@ -221,9 +226,10 @@ mfxStatus Session::Init(mfxVideoParam *par)
    return MFX_ERR_NONE;
 }
 
-mfxStatus Session::Reset(mfxVideoParam *)
+mfxStatus Session::Reset(mfxVideoParam *par)
 {
-   return Close();
+   param = *par;
+   return MFX_ERR_NONE;
 }
 
 mfxStatus Session::Close()
@@ -273,12 +279,15 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    if (surf_in.surface_id == VA_INVALID_SURFACE)
       return MFX_ERR_DEVICE_LOST;
 
+   struct enc_frame_feedback fb = {};
    struct enc_frame_params frame_params = {};
+   frame_params.feedback = &fb;
    frame_params.surface = &surf_in;
    frame_params.qp = param.mfx.QPI;
 
    if (ctrl) {
-      frame_params.qp = ctrl->QP;
+      if (ctrl->QP)
+         frame_params.qp = ctrl->QP;
 
       if (ctrl->FrameType) {
          if (ctrl->FrameType & MFX_FRAMETYPE_IDR) {
@@ -303,6 +312,22 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    SyncPoint *sp = new SyncPoint;
    sp->task = task;
    sp->bs = bs;
+   sp->bs->TimeStamp = surface->Data.TimeStamp;
+   sp->bs->DecodeTimeStamp = surface->Data.TimeStamp;
+
+   switch (fb.frame_type) {
+   case ENC_FRAME_TYPE_I:
+      sp->bs->FrameType = MFX_FRAMETYPE_I;
+      break;
+   case ENC_FRAME_TYPE_IDR:
+      sp->bs->FrameType = MFX_FRAMETYPE_IDR;
+      break;
+   case ENC_FRAME_TYPE_P:
+      sp->bs->FrameType = MFX_FRAMETYPE_P;
+      break;
+   default:
+      break;
+   }
 
    *syncp = reinterpret_cast<mfxSyncPoint>(sp);
 
