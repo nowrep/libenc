@@ -11,16 +11,16 @@ extern "C"
 
 // 1.0
 
-mfxStatus MFXInit(mfxIMPL impl, mfxVersion *ver, mfxSession *session)
+mfxStatus MFXInit(mfxIMPL, mfxVersion *, mfxSession *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXInitEx(mfxInitParam par, mfxSession *session)
+mfxStatus MFXInitEx(mfxInitParam, mfxSession *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXClose(mfxSession session)
@@ -29,10 +29,10 @@ mfxStatus MFXClose(mfxSession session)
    return MFX_ERR_NONE;
 }
 
-mfxStatus MFXJoinSession(mfxSession session, mfxSession child)
+mfxStatus MFXJoinSession(mfxSession, mfxSession)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXVideoCORE_GetHandle(mfxSession session, mfxHandleType type, mfxHDL *hdl)
@@ -52,10 +52,10 @@ mfxStatus MFXQueryVersion(mfxSession, mfxVersion *version)
    return MFX_ERR_NONE;
 }
 
-mfxStatus MFXVideoCORE_SetFrameAllocator(mfxSession session, mfxFrameAllocator *allocator)
+mfxStatus MFXVideoCORE_SetFrameAllocator(mfxSession, mfxFrameAllocator *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXVideoCORE_SetHandle(mfxSession session, mfxHandleType type, mfxHDL hdl)
@@ -98,10 +98,10 @@ mfxStatus MFXVideoENCODE_GetVideoParam(mfxSession session, mfxVideoParam *par)
    return Session::from_mfx(session)->GetVideoParam(par);
 }
 
-mfxStatus MFXVideoENCODE_GetEncodeStat(mfxSession session, mfxEncodeStat *stat)
+mfxStatus MFXVideoENCODE_GetEncodeStat(mfxSession, mfxEncodeStat *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXVideoENCODE_EncodeFrameAsync(mfxSession session, mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surface, mfxBitstream *bs, mfxSyncPoint *syncp)
@@ -109,136 +109,136 @@ mfxStatus MFXVideoENCODE_EncodeFrameAsync(mfxSession session, mfxEncodeCtrl *ctr
    return Session::from_mfx(session)->EncodeFrameAsync(ctrl, surface, bs, syncp);
 }
 
-mfxStatus MFXVideoDECODE_Query(mfxSession session, mfxVideoParam *in, mfxVideoParam *out)
+mfxStatus MFXVideoDECODE_Query(mfxSession, mfxVideoParam *, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_DecodeHeader(mfxSession session, mfxBitstream *bs, mfxVideoParam *par)
+mfxStatus MFXVideoDECODE_DecodeHeader(mfxSession, mfxBitstream *, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_QueryIOSurf(mfxSession session, mfxVideoParam *par, mfxFrameAllocRequest *request)
+mfxStatus MFXVideoDECODE_QueryIOSurf(mfxSession, mfxVideoParam *, mfxFrameAllocRequest *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_Init(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoDECODE_Init(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_Reset(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoDECODE_Reset(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_Close(mfxSession session)
+mfxStatus MFXVideoDECODE_Close(mfxSession)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_GetVideoParam(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoDECODE_GetVideoParam(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_GetDecodeStat(mfxSession session, mfxDecodeStat *stat)
+mfxStatus MFXVideoDECODE_GetDecodeStat(mfxSession, mfxDecodeStat *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_SetSkipMode(mfxSession session, mfxSkipMode mode)
+mfxStatus MFXVideoDECODE_SetSkipMode(mfxSession, mfxSkipMode)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_GetPayload(mfxSession session, mfxU64 *ts, mfxPayload *payload)
+mfxStatus MFXVideoDECODE_GetPayload(mfxSession, mfxU64 *, mfxPayload *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoDECODE_DecodeFrameAsync(mfxSession session, mfxBitstream *bs, mfxFrameSurface1 *surface_work, mfxFrameSurface1 **surface_out, mfxSyncPoint *syncp)
+mfxStatus MFXVideoDECODE_DecodeFrameAsync(mfxSession, mfxBitstream *, mfxFrameSurface1 *, mfxFrameSurface1 **, mfxSyncPoint *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_Query(mfxSession session, mfxVideoParam *in, mfxVideoParam *out)
+mfxStatus MFXVideoVPP_Query(mfxSession, mfxVideoParam *, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_QueryIOSurf(mfxSession session, mfxVideoParam *par, mfxFrameAllocRequest request[2])
+mfxStatus MFXVideoVPP_QueryIOSurf(mfxSession, mfxVideoParam *, mfxFrameAllocRequest[2])
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_Init(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoVPP_Init(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_Reset(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoVPP_Reset(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_Close(mfxSession session)
+mfxStatus MFXVideoVPP_Close(mfxSession)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_GetVideoParam(mfxSession session, mfxVideoParam *par)
+mfxStatus MFXVideoVPP_GetVideoParam(mfxSession, mfxVideoParam *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_GetVPPStat(mfxSession session, mfxVPPStat *stat)
+mfxStatus MFXVideoVPP_GetVPPStat(mfxSession, mfxVPPStat *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXVideoVPP_RunFrameVPPAsync(mfxSession session, mfxFrameSurface1 *in, mfxFrameSurface1 *out, mfxExtVppAuxData *aux, mfxSyncPoint *syncp)
+mfxStatus MFXVideoVPP_RunFrameVPPAsync(mfxSession, mfxFrameSurface1 *, mfxFrameSurface1 *, mfxExtVppAuxData *, mfxSyncPoint *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXDisjoinSession(mfxSession session)
+mfxStatus MFXDisjoinSession(mfxSession)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXSetPriority(mfxSession session, mfxPriority priority)
+mfxStatus MFXSetPriority(mfxSession, mfxPriority)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXGetPriority(mfxSession session, mfxPriority *priority)
+mfxStatus MFXGetPriority(mfxSession, mfxPriority *)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXVideoCORE_QueryPlatform(mfxSession session, mfxPlatform* platform)
@@ -257,22 +257,22 @@ mfxStatus MFXReleaseImplDescription(mfxHDL hdl)
    return ReleaseImplDescription(hdl);
 }
 
-mfxStatus MFXMemory_GetSurfaceForVPP(mfxSession session, mfxFrameSurface1** surface)
+mfxStatus MFXMemory_GetSurfaceForVPP(mfxSession, mfxFrameSurface1 **)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXMemory_GetSurfaceForEncode(mfxSession session, mfxFrameSurface1** surface)
+mfxStatus MFXMemory_GetSurfaceForEncode(mfxSession, mfxFrameSurface1 **)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXMemory_GetSurfaceForDecode(mfxSession session, mfxFrameSurface1** surface)
+mfxStatus MFXMemory_GetSurfaceForDecode(mfxSession, mfxFrameSurface1 **)
 {
    std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return MFX_ERR_NOT_IMPLEMENTED;
 }
 
 mfxStatus MFXInitialize(mfxInitializationParam par, mfxSession *session)
