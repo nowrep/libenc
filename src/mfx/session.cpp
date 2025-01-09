@@ -6,6 +6,7 @@
 #include <xf86drm.h>
 
 #include "../surface.h"
+#include "../encoder_h264.h"
 
 class SyncPoint
 {
@@ -22,8 +23,6 @@ Session::Session(const mfxInitializationParam &par)
 
 Session::~Session()
 {
-   if (dev)
-      enc_dev_destroy(dev);
 }
 
 mfxStatus Session::SetHandle(mfxHandleType type, mfxHDL hdl)
@@ -32,11 +31,13 @@ mfxStatus Session::SetHandle(mfxHandleType type, mfxHDL hdl)
    case MFX_HANDLE_VA_DISPLAY: {
       if (dpy)
          break;
-      struct enc_dev_params dev_params = {};
-      dev_params.va_display = hdl;
-      dev = enc_dev_create(&dev_params);
-      if (!dev)
+      struct enc_dev_params params = {};
+      params.va_display = hdl;
+      dev = std::make_unique<enc_dev>();
+      if (!dev->create(&params)) {
+         dev = {};
          break;
+      }
       dpy = hdl;
       return MFX_ERR_NONE;
    }
@@ -96,50 +97,101 @@ mfxStatus Session::QueryPlatform(mfxPlatform *platform)
 
 mfxStatus Session::Init(mfxVideoParam *par)
 {
+   if (enc)
+      return MFX_ERR_UNDEFINED_BEHAVIOR;
+
    param = *par;
 
-   struct enc_rate_control_params rc = {
-      .frame_rate = 30.0,
-      .bit_rate = 10000,
-      .vbv_buffer_size = 1000,
-   };
+   struct enc_rate_control_params rc = {};
+   rc.frame_rate = param.mfx.FrameInfo.FrameRateExtN / static_cast<float>(param.mfx.FrameInfo.FrameRateExtN);
+   rc.bit_rate = param.mfx.TargetKbps * 1000;
+   rc.peak_bit_rate = param.mfx.TargetKbps * 1000;
+   rc.vbv_buffer_size = param.mfx.BufferSizeInKB * 1024 * 8;
+   rc.vbv_initial_fullness = param.mfx.InitialDelayInKB * 1024 * 8;
+   rc.qvbr_quality = param.mfx.Quality;
 
-   struct enc_encoder_params encoder_params = {
-      .dev = dev,
-      .codec = ENC_CODEC_H264,
-      .width = param.mfx.FrameInfo.CropW,
-      .height = param.mfx.FrameInfo.CropH,
-      .bit_depth = 8,
-      .num_refs = 1,
-      .gop_size = param.mfx.GopRefDist,
-      .num_slices = 1,
-      .rc_mode = ENC_RATE_CONTROL_MODE_CQP,
-      .num_rc_layers = 1,
-      .rc_params = &rc,
-      .h264 = {
-         .profile = ENC_H264_PROFILE_HIGH,
-         .level = 52,
-      },
-   };
+   struct enc_encoder_params params = {};
+   params.dev = dev.get();
+   params.width = param.mfx.FrameInfo.CropW;
+   params.height = param.mfx.FrameInfo.CropH;
+   params.bit_depth = 8;
+   params.num_refs = param.mfx.NumRefFrame;
+   params.gop_size = param.mfx.GopRefDist;
+   params.num_slices = param.mfx.NumSlice;
+   params.num_rc_layers = 1;
+   params.rc_params = &rc;
 
-   enc = enc_encoder_create(&encoder_params);
-   if (!enc)
+   switch (param.mfx.RateControlMethod) {
+   case MFX_RATECONTROL_CBR:
+      params.rc_mode = ENC_RATE_CONTROL_MODE_CBR;
+      break;
+   case MFX_RATECONTROL_VBR:
+      params.rc_mode = ENC_RATE_CONTROL_MODE_VBR;
+      break;
+   case MFX_RATECONTROL_QVBR:
+      params.rc_mode = ENC_RATE_CONTROL_MODE_QVBR;
+      break;
+   default:
+      params.rc_mode = ENC_RATE_CONTROL_MODE_CQP;
+      break;
+   }
+
+   switch (param.mfx.CodecId) {
+   case MFX_CODEC_AVC:
+      params.codec = ENC_CODEC_H264;
+      params.h264.level = param.mfx.CodecLevel ? param.mfx.CodecLevel : 52;
+      switch (param.mfx.CodecProfile) {
+      case MFX_PROFILE_AVC_CONSTRAINED_BASELINE:
+         params.h264.profile = ENC_H264_PROFILE_CONSTRAINED_BASELINE;
+         break;
+      case MFX_PROFILE_AVC_MAIN:
+         params.h264.profile = ENC_H264_PROFILE_MAIN;
+         break;
+      default:
+      case MFX_PROFILE_AVC_HIGH:
+         params.h264.profile = ENC_H264_PROFILE_HIGH;
+         break;
+      }
+      break;
+   case MFX_CODEC_HEVC:
+      params.codec = ENC_CODEC_HEVC;
+      params.hevc.level = param.mfx.CodecLevel ? param.mfx.CodecLevel : 85;
+      switch (param.mfx.CodecProfile) {
+      default:
+      case MFX_PROFILE_HEVC_MAIN:
+         params.hevc.profile = ENC_HEVC_PROFILE_MAIN;
+         break;
+      case MFX_PROFILE_HEVC_MAIN10:
+         params.hevc.profile = ENC_HEVC_PROFILE_MAIN_10;
+         break;
+      }
+      break;
+   case MFX_CODEC_AV1:
+      params.codec = ENC_CODEC_AV1;
+      params.av1.level = param.mfx.CodecLevel ? param.mfx.CodecLevel : 60;
+      params.av1.profile = ENC_AV1_PROFILE_0;
+      break;
+   default:
+      break;
+   }
+
+   enc = std::make_unique<encoder_h264>();
+   if (!enc->create(&params)) {
+      enc = {};
       return MFX_ERR_DEVICE_FAILED;
+   }
 
    return MFX_ERR_NONE;
 }
 
-mfxStatus Session::Reset(mfxVideoParam *par)
+mfxStatus Session::Reset(mfxVideoParam *)
 {
-   return MFX_ERR_NONE;
+   return Close();
 }
 
 mfxStatus Session::Close()
 {
-   if (enc) {
-      enc_encoder_destroy(enc);
-      enc = nullptr;
-   }
+   enc = {};
    return MFX_ERR_NONE;
 }
 
@@ -148,18 +200,16 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    if (!surface)
       return MFX_ERR_MORE_DATA;
 
-   struct enc_surface_params surface_params = {
-      .dev = dev,
-      .format = ENC_FORMAT_NV12,
-      .width = surface->Info.Width,
-      .height = surface->Info.Height,
-   };
-   struct enc_surface *surf = enc_surface_create(&surface_params);
-
-   enc_surface *su = reinterpret_cast<enc_surface*>(surf);
+   struct enc_surface_params surface_params = {};
+   surface_params.dev = dev.get();
+   surface_params.format = ENC_FORMAT_NV12;
+   surface_params.width = surface->Info.Width;
+   surface_params.height = surface->Info.Height;
+   auto surf = std::make_unique<enc_surface>();
+   surf->create(&surface_params);
 
    VAImage image;
-   vaDeriveImage(dpy, su->surface_id, &image);
+   vaDeriveImage(dpy, surf->surface_id, &image);
 
    uint8_t *data;
    vaMapBuffer2(dpy, image.buf, reinterpret_cast<void**>(&data), VA_MAPBUFFER_FLAG_WRITE);
@@ -173,20 +223,22 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    vaUnmapBuffer(dpy, image.buf);
    vaDestroyImage(dpy, image.image_id);
 
-   // TODO COPY
+   struct enc_frame_params frame_params = {};
+   frame_params.surface = surf.get();
+   frame_params.qp = ctrl->QP;
 
-   struct enc_frame_feedback feedback;
-   struct enc_frame_params frame_params = {
-      .feedback = &feedback,
-   };
+   if (ctrl->FrameType) {
+      if (ctrl->FrameType & MFX_FRAMETYPE_IDR) {
+         frame_params.frame_type = ENC_FRAME_TYPE_IDR;
+      } else if (ctrl->FrameType & MFX_FRAMETYPE_I) {
+         frame_params.frame_type = ENC_FRAME_TYPE_I;
+      } else if (ctrl->FrameType & MFX_FRAMETYPE_P) {
+         frame_params.frame_type = ENC_FRAME_TYPE_P;
+         frame_params.not_referenced = !(ctrl->FrameType & MFX_FRAMETYPE_REF);
+      }
+   }
 
-   frame_params.surface = surf;
-   frame_params.qp = 20;
-
-   struct enc_task *task = enc_encoder_encode_frame(enc, &frame_params);
-
-   enc_surface_destroy(surf);
-
+   struct enc_task *task = enc->encode_frame(&frame_params);
    if (!task)
       return MFX_ERR_DEVICE_LOST;
 

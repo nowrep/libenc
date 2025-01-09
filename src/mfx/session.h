@@ -2,9 +2,13 @@
 
 #include <va/va.h>
 #include <vpl/mfxvideo.h>
+
 #include <enc/enc.h>
+#include "../dev.h"
+#include "../encoder.h"
 
 #include <string>
+#include <memory>
 
 class Session
 {
@@ -17,8 +21,8 @@ public:
 
    mfxVideoParam param = {};
 
-   struct enc_dev *dev = nullptr;
-   struct enc_encoder *enc = nullptr;
+   std::unique_ptr<enc_dev> dev;
+   std::unique_ptr<enc_encoder> enc;
 
    mfxSession to_mfx()
    {
