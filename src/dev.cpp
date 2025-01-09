@@ -21,6 +21,10 @@ enc_dev::~enc_dev()
    }
 }
 
+static void log_dummy(void *, const char *)
+{
+}
+
 bool enc_dev::create(const struct enc_dev_params *params)
 {
    if (params->va_display) {
@@ -37,6 +41,9 @@ bool enc_dev::create(const struct enc_dev_params *params)
          std::cerr << "Failed to get VADisplay\n";
          return false;
       }
+
+      vaSetInfoCallback(dpy, log_dummy, nullptr);
+      vaSetErrorCallback(dpy, log_dummy, nullptr);
 
       int major_ver, minor_ver;
       VAStatus status = vaInitialize(dpy, &major_ver, &minor_ver);
