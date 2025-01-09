@@ -45,4 +45,5 @@ public:
    mfxStatus Close();
    mfxStatus EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surface, mfxBitstream *bs, mfxSyncPoint *syncp);
    mfxStatus SyncOperation(mfxSyncPoint syncp, mfxU32 wait);
+   mfxStatus GetSurfaceForEncode(mfxFrameSurface1 **surface);
 };

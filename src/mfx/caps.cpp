@@ -28,6 +28,7 @@ static const mfxChar *g_functions[] = {
    "MFXVideoENCODE_EncodeFrameAsync",
    "MFXQueryImplsDescription",
    "MFXReleaseImplDescription",
+   "MFXMemory_GetSurfaceForEncode",
    "MFXInitialize",
 };
 

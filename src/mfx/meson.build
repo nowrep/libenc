@@ -5,6 +5,7 @@ files_libmfx = files(
   'mfx.cpp',
   'caps.cpp',
   'session.cpp',
+  'surface.cpp',
 )
 
 libmfx = library(

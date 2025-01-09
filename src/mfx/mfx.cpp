@@ -263,10 +263,9 @@ mfxStatus MFXMemory_GetSurfaceForVPP(mfxSession, mfxFrameSurface1 **)
    return MFX_ERR_NOT_IMPLEMENTED;
 }
 
-mfxStatus MFXMemory_GetSurfaceForEncode(mfxSession, mfxFrameSurface1 **)
+mfxStatus MFXMemory_GetSurfaceForEncode(mfxSession session, mfxFrameSurface1 **surface)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_NOT_IMPLEMENTED;
+   return Session::from_mfx(session)->GetSurfaceForEncode(surface);
 }
 
 mfxStatus MFXMemory_GetSurfaceForDecode(mfxSession, mfxFrameSurface1 **)

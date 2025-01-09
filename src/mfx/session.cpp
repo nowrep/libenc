@@ -1,4 +1,5 @@
 #include "session.h"
+#include "surface.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -200,31 +201,32 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    if (!surface)
       return MFX_ERR_MORE_DATA;
 
-   struct enc_surface_params surface_params = {};
-   surface_params.dev = dev.get();
-   surface_params.format = ENC_FORMAT_NV12;
-   surface_params.width = surface->Info.Width;
-   surface_params.height = surface->Info.Height;
-   auto surf = std::make_unique<enc_surface>();
-   surf->create(&surface_params);
+   mfxFrameSurface1 *surf = nullptr;
 
-   VAImage image;
-   vaDeriveImage(dpy, surf->surface_id, &image);
+   if (param.IOPattern == MFX_IOPATTERN_IN_SYSTEM_MEMORY) {
+      if (GetSurfaceForEncode(&surf) != MFX_ERR_NONE)
+         return MFX_ERR_DEVICE_LOST;
+      if (surf->FrameInterface->Map(surf, MFX_MAP_WRITE) != MFX_ERR_NONE)
+         return MFX_ERR_DEVICE_LOST;
+      for (mfxU32 i = 0; i < surface->Info.Height; i++)
+         memcpy(surf->Data.Y + i * surf->Data.Pitch, surface->Data.Y + i * surface->Data.Pitch, surface->Data.Pitch);
+      if (surface->Info.FourCC == MFX_FOURCC_NV12 || surface->Info.FourCC == MFX_FOURCC_P010) {
+         for (uint32_t i = 0; i < surface->Info.Height / 2; i++)
+            memcpy(surf->Data.UV + i * surf->Data.Pitch, surface->Data.UV + i * surface->Data.Pitch, surface->Data.Pitch);
+      }
+      surf->FrameInterface->Unmap(surf);
+   } else if (param.IOPattern == MFX_IOPATTERN_IN_VIDEO_MEMORY) {
+      surf = surface;
+      surf->FrameInterface->AddRef(surf);
+   } else {
+      return MFX_ERR_UNDEFINED_BEHAVIOR;
+   }
 
-   uint8_t *data;
-   vaMapBuffer2(dpy, image.buf, reinterpret_cast<void**>(&data), VA_MAPBUFFER_FLAG_WRITE);
-
-   for (uint32_t i = 0; i < surface->Info.Height; i++)
-      memcpy(data + i * image.pitches[0], surface->Data.Y + i * surface->Data.Pitch, surface->Data.Pitch);
-
-   for (uint32_t i = 0; i < surface->Info.Height / 2; i++)
-      memcpy(data + image.offsets[1] + i * image.pitches[1], surface->Data.UV + i * surface->Data.Pitch, surface->Data.Pitch);
-
-   vaUnmapBuffer(dpy, image.buf);
-   vaDestroyImage(dpy, image.image_id);
+   struct enc_surface surf_in = {};
+   surf->FrameInterface->GetNativeHandle(surf, reinterpret_cast<mfxHDL *>(&surf_in.surface_id), nullptr);
 
    struct enc_frame_params frame_params = {};
-   frame_params.surface = surf.get();
+   frame_params.surface = &surf_in;
    frame_params.qp = ctrl->QP;
 
    if (ctrl->FrameType) {
@@ -239,6 +241,9 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    }
 
    struct enc_task *task = enc->encode_frame(&frame_params);
+
+   surf->FrameInterface->Release(surf);
+
    if (!task)
       return MFX_ERR_DEVICE_LOST;
 
@@ -274,5 +279,14 @@ mfxStatus Session::SyncOperation(mfxSyncPoint syncp, mfxU32 wait)
    sp->task = nullptr;
    delete sp;
 
+   return MFX_ERR_NONE;
+}
+
+mfxStatus Session::GetSurfaceForEncode(mfxFrameSurface1 **surface)
+{
+   auto s = std::make_unique<Surface>(this);
+   if (!s->create())
+      return MFX_ERR_MEMORY_ALLOC;
+   *surface = s.release();
    return MFX_ERR_NONE;
 }
