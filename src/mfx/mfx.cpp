@@ -7,6 +7,8 @@
 #include <memory.h>
 #include <iostream>
 
+#include "caps.h"
+
 class Session
 {
 public:
@@ -434,93 +436,12 @@ mfxStatus MFXVideoCORE_QueryPlatform(mfxSession session, mfxPlatform* platform)
 // 2.0
 mfxHDL *MFXQueryImplsDescription(mfxImplCapsDeliveryFormat format, mfxU32 *num_impls)
 {
-   std::cout << __FUNCTION__ << " " << format << " " << num_impls <<  std::endl;
-
-   if (!num_impls)
-      return nullptr;
-
-   *num_impls = 0;
-
-   if (format == MFX_IMPLCAPS_IMPLDESCSTRUCTURE) {
-
-      static mfxEncoderDescription::encoder::encprofile profile = {
-         .Profile = MFX_PROFILE_AVC_HIGH,
-         .NumMemTypes = 0,
-      };
-
-      static mfxEncoderDescription::encoder codecs[] = {
-         {
-            .CodecID = MFX_CODEC_AVC,
-            .MaxcodecLevel = 51,
-            .NumProfiles = 1,
-            .Profiles = &profile,
-         },
-      };
-
-      static mfxAccelerationMode vaapi_mode = MFX_ACCEL_MODE_VIA_VAAPI;
-
-      static mfxPoolAllocationPolicy pool_policy = MFX_ALLOCATION_OPTIMAL;
-
-      static mfxImplDescription desc = {
-         .Version = { .Version = MFX_STRUCT_VERSION(1, 0) },
-         .Impl = MFX_IMPL_TYPE_HARDWARE,
-         .ApiVersion = {
-            .Minor = 0,
-            .Major = 2,
-         },
-         .ImplName = "libenc",
-         .License = "MIT",
-         .Keywords = "libenc",
-         .Dev = {
-            .Version = { .Version = MFX_STRUCT_VERSION(1, 0) },
-            .MediaAdapterType = MFX_MEDIA_DISCRETE,
-         },
-         .Enc = {
-            .Version = { .Version = MFX_STRUCT_VERSION(1, 0) },
-            .NumCodecs = 1,
-            .Codecs = codecs,
-         },
-         .AccelerationModeDescription = {
-            .Version = { .Version = MFX_STRUCT_VERSION(1, 0) },
-            .NumAccelerationModes = 1,
-            .Mode = &vaapi_mode,
-         },
-         .PoolPolicies = {
-            .Version = { .Version = MFX_STRUCT_VERSION(1, 0) },
-            .NumPoolPolicies = 1,
-            .Policy = &pool_policy,
-         }
-      };
-      *num_impls = 1;
-      static mfxImplDescription *out[] = { &desc };
-      return reinterpret_cast<mfxHDL*>(&out);
-   }
-
-   if (format == MFX_IMPLCAPS_IMPLEMENTEDFUNCTIONS) {
-      return nullptr;
-      // static mfxImplementedFunctions funcs;
-      // *num_impls = 1;
-      // return reinterpret_cast<mfxHDL*>(&funcs);
-   }
-
-   if (format == MFX_IMPLCAPS_IMPLPATH) {
-      *num_impls = 1;
-      return reinterpret_cast<mfxHDL*>(const_cast<char*>("implpath"));
-   }
-
-   if (format == MFX_IMPLCAPS_DEVICE_ID_EXTENDED) {
-      // static mfxExtendedDeviceId id;
-      // *num_impls = 1;
-      // return reinterpret_cast<mfxHDL*>(&id);
-   }
-
-   return nullptr;
+   return QueryImplsDescription(format, num_impls);
 }
 
 mfxStatus MFXReleaseImplDescription(mfxHDL hdl)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_UNKNOWN;
+   return ReleaseImplDescription(hdl);
 }
 
 mfxStatus MFXMemory_GetSurfaceForVPP(mfxSession session, mfxFrameSurface1** surface)

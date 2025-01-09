@@ -1,11 +1,13 @@
 libvpl = dependency('vpl')
+libdrm = dependency('libdrm')
 
 files_libmfx = files(
   'mfx.cpp',
+  'caps.cpp',
 )
 
 libmfx = library(
   'mfx',
   files_libmfx,
-  dependencies: [libvpl, libenc_dep],
+  dependencies: [libvpl, libdrm, libenc_dep],
 )
