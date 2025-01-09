@@ -281,4 +281,47 @@ mfxStatus MFXInitialize(mfxInitializationParam par, mfxSession *session)
    return MFX_ERR_NONE;
 }
 
+// 2.1
+mfxStatus MFXMemory_GetSurfaceForVPPOut(mfxSession, mfxFrameSurface1 **)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoDECODE_VPP_Init(mfxSession, mfxVideoParam *, mfxVideoChannelParam **, mfxU32)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoDECODE_VPP_DecodeFrameAsync(mfxSession, mfxBitstream *, mfxU32 *, mfxU32, mfxSurfaceArray **)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoDECODE_VPP_Reset(mfxSession, mfxVideoParam *, mfxVideoChannelParam **, mfxU32)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoDECODE_VPP_GetChannelParam(mfxSession, mfxVideoChannelParam *, mfxU32)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoDECODE_VPP_Close(mfxSession)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
+mfxStatus MFXVideoVPP_ProcessFrameAsync(mfxSession, mfxFrameSurface1 *, mfxFrameSurface1 **)
+{
+   std::cout << __FUNCTION__ << std::endl;
+   return MFX_ERR_NOT_IMPLEMENTED;
+}
+
 }
