@@ -69,14 +69,17 @@ mfxStatus Session::GetVideoParam(mfxVideoParam *par)
 mfxStatus Session::Query(mfxVideoParam *in, mfxVideoParam *out)
 {
    *out = *in;
+   out->AllocId = ++alloc_id;
    return MFX_ERR_NONE;
 }
 
 mfxStatus Session::QueryIOSurf(mfxVideoParam *par, mfxFrameAllocRequest *request)
 {
-   request->NumFrameSuggested = par->AsyncDepth + 4;
-   request->Type |= MFX_MEMTYPE_FROM_ENCODE | MFX_MEMTYPE_SYSTEM_MEMORY;
+   request->AllocId = par->AllocId;
    request->Info = par->mfx.FrameInfo;
+   request->Type |= MFX_MEMTYPE_FROM_ENCODE | MFX_MEMTYPE_SYSTEM_MEMORY;
+   request->NumFrameMin = par->mfx.NumRefFrame + par->AsyncDepth + 1;
+   request->NumFrameSuggested = request->NumFrameMin;
    return MFX_ERR_NONE;
 }
 

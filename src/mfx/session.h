@@ -20,6 +20,7 @@ public:
    std::string dev_path;
 
    mfxVideoParam param = {};
+   mfxU32 alloc_id = 0;
 
    std::unique_ptr<enc_dev> dev;
    std::unique_ptr<enc_encoder> enc;
