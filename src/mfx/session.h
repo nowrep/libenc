@@ -21,6 +21,8 @@ public:
 
    mfxVideoParam param = {};
    mfxU32 alloc_id = 0;
+   mfxFrameAllocator *alloc = nullptr;
+   mfxFrameAllocResponse alloc_response = {};
 
    std::unique_ptr<enc_dev> dev;
    std::unique_ptr<enc_encoder> enc;
@@ -47,4 +49,5 @@ public:
    mfxStatus EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surface, mfxBitstream *bs, mfxSyncPoint *syncp);
    mfxStatus SyncOperation(mfxSyncPoint syncp, mfxU32 wait);
    mfxStatus GetSurfaceForEncode(mfxFrameSurface1 **surface);
+   mfxStatus SetFrameAllocator(mfxFrameAllocator *allocator);
 };

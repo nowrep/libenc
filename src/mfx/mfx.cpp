@@ -52,10 +52,9 @@ mfxStatus MFXQueryVersion(mfxSession, mfxVersion *version)
    return MFX_ERR_NONE;
 }
 
-mfxStatus MFXVideoCORE_SetFrameAllocator(mfxSession, mfxFrameAllocator *)
+mfxStatus MFXVideoCORE_SetFrameAllocator(mfxSession session, mfxFrameAllocator *allocator)
 {
-   std::cout << __FUNCTION__ << std::endl;
-   return MFX_ERR_NOT_IMPLEMENTED;
+   return Session::from_mfx(session)->SetFrameAllocator(allocator);
 }
 
 mfxStatus MFXVideoCORE_SetHandle(mfxSession session, mfxHandleType type, mfxHDL hdl)

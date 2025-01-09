@@ -75,9 +75,14 @@ mfxStatus Session::Query(mfxVideoParam *in, mfxVideoParam *out)
 
 mfxStatus Session::QueryIOSurf(mfxVideoParam *par, mfxFrameAllocRequest *request)
 {
+   memset(request, 0, sizeof(*request));
    request->AllocId = par->AllocId;
    request->Info = par->mfx.FrameInfo;
-   request->Type |= MFX_MEMTYPE_FROM_ENCODE | MFX_MEMTYPE_SYSTEM_MEMORY;
+   request->Type = MFX_MEMTYPE_FROM_ENCODE;
+   if (par->IOPattern == MFX_IOPATTERN_IN_VIDEO_MEMORY)
+      request->Type |= MFX_MEMTYPE_VIDEO_MEMORY_ENCODER_TARGET;
+   else if (par->IOPattern == MFX_IOPATTERN_IN_SYSTEM_MEMORY)
+      request->Type |= MFX_MEMTYPE_SYSTEM_MEMORY;
    request->NumFrameMin = par->mfx.NumRefFrame + par->AsyncDepth + 1;
    request->NumFrameSuggested = request->NumFrameMin;
    return MFX_ERR_NONE;
@@ -105,6 +110,13 @@ mfxStatus Session::Init(mfxVideoParam *par)
       return MFX_ERR_UNDEFINED_BEHAVIOR;
 
    param = *par;
+
+   if (alloc) {
+      mfxFrameAllocRequest request = {};
+      QueryIOSurf(par, &request);
+      if (alloc->Alloc(alloc->pthis, &request, &alloc_response) != MFX_ERR_NONE)
+         return MFX_ERR_MEMORY_ALLOC;
+   }
 
    struct enc_rate_control_params rc = {};
    rc.frame_rate = param.mfx.FrameInfo.FrameRateExtN / static_cast<float>(param.mfx.FrameInfo.FrameRateExtN);
@@ -195,6 +207,8 @@ mfxStatus Session::Reset(mfxVideoParam *)
 
 mfxStatus Session::Close()
 {
+   if (alloc && alloc->Free(alloc->pthis, &alloc_response) != MFX_ERR_NONE)
+      return MFX_ERR_MEMORY_ALLOC;
    enc = {};
    return MFX_ERR_NONE;
 }
@@ -220,13 +234,22 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
       surf->FrameInterface->Unmap(surf);
    } else if (param.IOPattern == MFX_IOPATTERN_IN_VIDEO_MEMORY) {
       surf = surface;
-      surf->FrameInterface->AddRef(surf);
+      if (surf->FrameInterface)
+         surf->FrameInterface->AddRef(surf);
    } else {
-      return MFX_ERR_UNDEFINED_BEHAVIOR;
+      return MFX_ERR_DEVICE_LOST;
    }
 
    struct enc_surface surf_in = {};
-   surf->FrameInterface->GetNativeHandle(surf, reinterpret_cast<mfxHDL *>(&surf_in.surface_id), nullptr);
+   surf_in.surface_id = VA_INVALID_SURFACE;
+
+   if (alloc)
+      alloc->GetHDL(alloc->pthis, surf->Data.MemId, reinterpret_cast<mfxHDL *>(&surf_in.surface_id));
+   else if (surf->FrameInterface)
+      surf->FrameInterface->GetNativeHandle(surf, reinterpret_cast<mfxHDL *>(&surf_in.surface_id), nullptr);
+
+   if (surf_in.surface_id == VA_INVALID_SURFACE)
+      return MFX_ERR_DEVICE_LOST;
 
    struct enc_frame_params frame_params = {};
    frame_params.surface = &surf_in;
@@ -245,7 +268,8 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
 
    struct enc_task *task = enc->encode_frame(&frame_params);
 
-   surf->FrameInterface->Release(surf);
+   if (!alloc && surf->FrameInterface)
+      surf->FrameInterface->Release(surf);
 
    if (!task)
       return MFX_ERR_DEVICE_LOST;
@@ -291,5 +315,11 @@ mfxStatus Session::GetSurfaceForEncode(mfxFrameSurface1 **surface)
    if (!s->create())
       return MFX_ERR_MEMORY_ALLOC;
    *surface = s.release();
+   return MFX_ERR_NONE;
+}
+
+mfxStatus Session::SetFrameAllocator(mfxFrameAllocator *allocator)
+{
+   alloc = allocator;
    return MFX_ERR_NONE;
 }

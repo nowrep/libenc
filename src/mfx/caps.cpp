@@ -17,6 +17,7 @@ static const mfxChar *g_functions[] = {
    "MFXVideoCORE_GetHandle",
    "MFXQueryIMPL",
    "MFXQueryVersion",
+   "MFXVideoCORE_SetFrameAllocator",
    "MFXVideoCORE_SetHandle",
    "MFXVideoCORE_SyncOperation",
    "MFXVideoENCODE_Query",
