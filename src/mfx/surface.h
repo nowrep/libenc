@@ -20,6 +20,7 @@ public:
 
    bool create();
 
+   static mfxU32 Context;
    static mfxStatus AddRef(mfxFrameSurface1 *surface);
    static mfxStatus Release(mfxFrameSurface1 *surface);
    static mfxStatus GetRefCounter(mfxFrameSurface1 *surface, mfxU32 *counter);

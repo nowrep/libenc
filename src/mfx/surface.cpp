@@ -1,5 +1,7 @@
 #include "surface.h"
 
+mfxU32 Surface::Context = 0xAB;
+
 Surface::Surface(Session *session)
    : session(session)
 {
@@ -7,7 +9,7 @@ Surface::Surface(Session *session)
    Version.Version = MFX_FRAMESURFACE1_VERSION;
    Info = session->param.mfx.FrameInfo;
    FrameInterface = new mfxFrameSurfaceInterface();
-   FrameInterface->Context = this;
+   FrameInterface->Context = &Context;
    FrameInterface->Version.Version = MFX_FRAMESURFACEINTERFACE_VERSION;
    FrameInterface->AddRef = Surface::AddRef;
    FrameInterface->Release = Surface::Release;
