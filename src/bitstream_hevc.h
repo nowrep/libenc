@@ -184,7 +184,7 @@ public:
       uint8_t slice_loop_filter_across_slices_enabled_flag : 1;
    };
 
-   bitstream_hevc();
+   bitstream_hevc(bool emulation_prevention = false);
 
    void write_vps(const vps &vps);
    void write_sps(const sps &sps);
@@ -195,4 +195,6 @@ private:
    void write_nal_header(uint8_t nal_unit_type, uint8_t temporal_id);
    void write_profile_tier_level(uint8_t max_sublayers_minus1, const profile_tier_level &ptl);
    void write_st_ref_pic_set(uint8_t index, const st_ref_pic_set &rps);
+
+   bool emulation_prevention = false;
 };

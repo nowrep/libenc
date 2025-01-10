@@ -442,3 +442,18 @@ void enc_encoder::update_intra_refresh()
    rir.intra_insertion_location = (enc_params.gop_count % gop_size) * rir.intra_insert_size;
    add_misc_buffer(VAEncMiscParameterTypeRIR, sizeof(rir), &rir);
 }
+
+uint32_t enc_encoder::write_sps(uint8_t *, uint32_t)
+{
+   return 0;
+}
+
+uint32_t enc_encoder::write_pps(uint8_t *, uint32_t)
+{
+   return 0;
+}
+
+uint32_t enc_encoder::write_vps(uint8_t *, uint32_t)
+{
+   return 0;
+}

@@ -15,6 +15,9 @@ public:
    bool create(const struct enc_encoder_params *params) override;
    struct enc_task *encode_frame(const struct enc_frame_params *params) override;
 
+   uint32_t write_sps(uint8_t *buf, uint32_t buf_size) override;
+   uint32_t write_pps(uint8_t *buf, uint32_t buf_size) override;
+
 private:
    bitstream_h264::sps sps = {};
    bitstream_h264::pps pps = {};

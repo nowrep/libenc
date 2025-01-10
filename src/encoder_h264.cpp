@@ -1,6 +1,7 @@
 #include "encoder_h264.h"
 #include "bitstream_h264.h"
 
+#include <cstring>
 #include <algorithm>
 
 encoder_h264::encoder_h264()
@@ -359,4 +360,24 @@ struct enc_task *encoder_h264::encode_frame(const struct enc_frame_params *param
       pic_order_cnt = 0;
 
    return task.release();
+}
+
+uint32_t encoder_h264::write_sps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_h264 bs(true);
+   bs.write_sps(sps);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
+}
+
+uint32_t encoder_h264::write_pps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_h264 bs(true);
+   bs.write_pps(pps);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
 }

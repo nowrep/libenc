@@ -1,6 +1,8 @@
 #include "encoder_av1.h"
 #include "bitstream_av1.h"
 
+#include <cstring>
+
 encoder_av1::encoder_av1()
    : enc_encoder()
 {
@@ -194,4 +196,14 @@ struct enc_task *encoder_av1::encode_frame(const struct enc_frame_params *params
    }
 
    return task.release();
+}
+
+uint32_t encoder_av1::write_sps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_av1 bs(features3.bits.obu_size_bytes_minus1 + 1);
+   bs.write_seq(seq);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
 }

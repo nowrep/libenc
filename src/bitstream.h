@@ -22,9 +22,12 @@ public:
 
    void byte_align();
    void trailing_bits();
+   void enable_emulation_prevention();
 
 private:
    std::vector<uint8_t> buf;
    uint32_t shifter = 0;
    uint32_t bits_in_shifter = 0;
+   uint32_t num_zeros = 0;
+   bool emulation_prevention = false;
 };

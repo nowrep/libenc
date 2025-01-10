@@ -1,8 +1,9 @@
 #include "bitstream_hevc.h"
 #include "util.h"
 
-bitstream_hevc::bitstream_hevc()
+bitstream_hevc::bitstream_hevc(bool emulation_prevention)
    : bitstream()
+   , emulation_prevention(emulation_prevention)
 {
 }
 
@@ -271,6 +272,9 @@ void bitstream_hevc::write_nal_header(uint8_t nal_unit_type, uint8_t temporal_id
    ui(nal_unit_type, 6);
    ui(0x0, 6); // nuh_layer_id
    ui(temporal_id + 1, 3);
+
+   if (emulation_prevention)
+      enable_emulation_prevention();
 }
 
 void bitstream_hevc::write_profile_tier_level(uint8_t max_sublayers_minus1, const profile_tier_level &ptl)

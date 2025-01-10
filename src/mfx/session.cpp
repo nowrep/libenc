@@ -11,13 +11,22 @@
 #include "../encoder_hevc.h"
 #include "../encoder_av1.h"
 
+template <typename T>
+static T *find_ext_buf(mfxVideoParam *param, mfxU32 id)
+{
+   for (auto i = 0; i < param->NumExtParam; i++) {
+      if (param->ExtParam[i]->BufferId == id)
+         return reinterpret_cast<T *>(param->ExtParam[i]);
+   }
+   return nullptr;
+}
+
 class SyncPoint
 {
 public:
    mfxBitstream *bs = nullptr;
    struct enc_task *task = nullptr;
 };
-
 
 Session::Session(const mfxInitializationParam &par)
 {
@@ -64,6 +73,17 @@ mfxStatus Session::GetHandle(mfxHandleType type, mfxHDL *hdl)
 
 mfxStatus Session::GetVideoParam(mfxVideoParam *par)
 {
+   if (!enc)
+      return MFX_ERR_UNDEFINED_BEHAVIOR;
+
+   if (auto sps_pps = find_ext_buf<mfxExtCodingOptionSPSPPS>(par, MFX_EXTBUFF_CODING_OPTION_SPSPPS)) {
+      sps_pps->SPSBufSize = enc->write_sps(sps_pps->SPSBuffer, sps_pps->SPSBufSize);
+      sps_pps->PPSBufSize = enc->write_pps(sps_pps->PPSBuffer, sps_pps->PPSBufSize);
+   }
+
+   if (auto vps = find_ext_buf<mfxExtCodingOptionVPS>(par, MFX_EXTBUFF_CODING_OPTION_VPS))
+      vps->VPSBufSize = enc->write_vps(vps->VPSBuffer, vps->VPSBufSize);
+
    *par = param;
    return MFX_ERR_NONE;
 }

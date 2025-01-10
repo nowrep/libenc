@@ -1,7 +1,8 @@
 #include "bitstream_h264.h"
 
-bitstream_h264::bitstream_h264()
+bitstream_h264::bitstream_h264(bool emulation_prevention)
    : bitstream()
+   , emulation_prevention(emulation_prevention)
 {
 }
 
@@ -295,6 +296,9 @@ void bitstream_h264::write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type
    ui(0x0, 1); // forbidden_zero_bit
    ui(nal_ref_idc, 2);
    ui(nal_unit_type, 5);
+
+   if (emulation_prevention)
+      enable_emulation_prevention();
 }
 
 void bitstream_h264::write_sei(uint32_t type, const bitstream &bs)

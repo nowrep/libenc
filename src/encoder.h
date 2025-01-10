@@ -31,6 +31,10 @@ struct enc_encoder
    void update_rate_control(const struct enc_rate_control_params *params);
    void update_intra_refresh();
 
+   virtual uint32_t write_sps(uint8_t *buf, uint32_t buf_size);
+   virtual uint32_t write_pps(uint8_t *buf, uint32_t buf_size);
+   virtual uint32_t write_vps(uint8_t *buf, uint32_t buf_size);
+
    VADisplay dpy;
    VAConfigID config_id = VA_INVALID_ID;
    VAContextID context_id = VA_INVALID_ID;

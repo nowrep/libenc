@@ -1,6 +1,7 @@
 #include "encoder_hevc.h"
 #include "bitstream_hevc.h"
 
+#include <cstring>
 #include <algorithm>
 
 encoder_hevc::encoder_hevc()
@@ -316,4 +317,34 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
    pic_order_cnt++;
 
    return task.release();
+}
+
+uint32_t encoder_hevc::write_sps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_hevc bs(true);
+   bs.write_sps(sps);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
+}
+
+uint32_t encoder_hevc::write_pps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_hevc bs(true);
+   bs.write_pps(pps);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
+}
+
+uint32_t encoder_hevc::write_vps(uint8_t *buf, uint32_t buf_size)
+{
+   bitstream_hevc bs(true);
+   bs.write_vps(vps);
+   if (bs.size() > buf_size)
+      return 0;
+   std::memcpy(buf, bs.data(), bs.size());
+   return bs.size();
 }

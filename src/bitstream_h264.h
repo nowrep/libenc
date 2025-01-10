@@ -149,7 +149,7 @@ public:
       uint32_t num_layers_minus1;
    };
 
-   bitstream_h264();
+   bitstream_h264(bool emulation_prevention = false);
 
    void write_sps(const sps &sps);
    void write_pps(const pps &pps);
@@ -161,4 +161,6 @@ public:
 private:
    void write_nal_header(uint8_t nal_ref_idc, uint8_t nal_unit_type);
    void write_sei(uint32_t type, const bitstream &bs);
+
+   bool emulation_prevention = false;
 };

@@ -29,6 +29,7 @@ void bitstream::reset()
    buf.clear();
    shifter = 0;
    bits_in_shifter = 0;
+   emulation_prevention = false;
 }
 
 void bitstream::ue(uint32_t value)
@@ -69,7 +70,12 @@ void bitstream::ui(uint32_t value, uint8_t bits)
       while (bits_in_shifter >= 8) {
          uint8_t output_byte = shifter >> 24;
          shifter <<= 8;
+         if (emulation_prevention && num_zeros >= 2 && output_byte <= 3) {
+            buf.push_back(3);
+            num_zeros = 0;
+         }
          buf.push_back(output_byte);
+         num_zeros = output_byte ? 0 : num_zeros + 1;
          bits_in_shifter -= 8;
       }
    }
@@ -105,4 +111,9 @@ void bitstream::trailing_bits()
 {
    ui(0x1, 1);
    byte_align();
+}
+
+void bitstream::enable_emulation_prevention()
+{
+   emulation_prevention = true;
 }
