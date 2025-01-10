@@ -354,17 +354,23 @@ mfxStatus Session::SyncOperation(mfxSyncPoint syncp, mfxU32 wait)
    uint8_t *out = sp->bs->Data;
    sp->bs->DataLength = 0;
 
+   mfxStatus ret = MFX_ERR_NONE;
+
    while (enc_task_get_bitstream(sp->task, &size, &data)) {
-      memcpy(out, data, size);
-      out += size;
-      sp->bs->DataLength += size;
+      if (sp->bs->DataLength + size < sp->bs->MaxLength) {
+         memcpy(out, data, size);
+         out += size;
+         sp->bs->DataLength += size;
+      } else {
+         ret = MFX_ERR_NOT_ENOUGH_BUFFER;
+      }
    }
 
    enc_task_destroy(sp->task);
    sp->task = nullptr;
    delete sp;
 
-   return MFX_ERR_NONE;
+   return ret;
 }
 
 mfxStatus Session::GetSurfaceForEncode(mfxFrameSurface1 **surface)
