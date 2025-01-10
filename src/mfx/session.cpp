@@ -65,6 +65,15 @@ mfxStatus Session::GetHandle(mfxHandleType type, mfxHDL *hdl)
    case MFX_HANDLE_VA_DISPLAY:
       *hdl = dpy;
       return MFX_ERR_NONE;
+   case MFX_HANDLE_MEMORY_INTERFACE:
+      if (!mem) {
+         mem = std::make_unique<mfxMemoryInterface>();
+         mem->Context = this;
+         mem->Version.Version = MFX_MEMORYINTERFACE_VERSION;
+         mem->ImportFrameSurface = Session::ImportFrameSurface;
+      }
+      *hdl = mem.get();
+      return MFX_ERR_NONE;
    default:
       break;
    }
@@ -410,5 +419,19 @@ mfxStatus Session::GetSurfaceForEncode(mfxFrameSurface1 **surface)
 mfxStatus Session::SetFrameAllocator(mfxFrameAllocator *allocator)
 {
    alloc = allocator;
+   return MFX_ERR_NONE;
+}
+
+mfxStatus Session::ImportFrameSurface(struct mfxMemoryInterface *memory_interface, mfxSurfaceComponent surf_component, mfxSurfaceHeader *external_surface, mfxFrameSurface1 **imported_surface)
+{
+   if (surf_component != MFX_SURFACE_COMPONENT_ENCODE)
+      return MFX_ERR_UNSUPPORTED;
+   auto session = reinterpret_cast<Session *>(memory_interface->Context);
+   auto vaapi = reinterpret_cast<mfxSurfaceVAAPI *>(external_surface);
+   if (vaapi->vaDisplay != session->dpy)
+      return MFX_ERR_INVALID_HANDLE;
+   auto s = std::make_unique<Surface>(session);
+   s->surface_id = vaapi->vaSurfaceID;
+   *imported_surface = s.release();
    return MFX_ERR_NONE;
 }

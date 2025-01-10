@@ -1,5 +1,7 @@
 #pragma once
 
+#define ONEVPL_EXPERIMENTAL
+
 #include <va/va.h>
 #include <vpl/mfxvideo.h>
 
@@ -23,6 +25,7 @@ public:
    mfxU32 alloc_id = 0;
    mfxFrameAllocator *alloc = nullptr;
    mfxFrameAllocResponse alloc_response = {};
+   std::unique_ptr<mfxMemoryInterface> mem;
 
    std::unique_ptr<enc_dev> dev;
    std::unique_ptr<enc_encoder> enc;
@@ -50,4 +53,6 @@ public:
    mfxStatus SyncOperation(mfxSyncPoint syncp, mfxU32 wait);
    mfxStatus GetSurfaceForEncode(mfxFrameSurface1 **surface);
    mfxStatus SetFrameAllocator(mfxFrameAllocator *allocator);
+
+   static mfxStatus ImportFrameSurface(struct mfxMemoryInterface *memory_interface, mfxSurfaceComponent surf_component, mfxSurfaceHeader *external_surface, mfxFrameSurface1 **imported_surface);
 };
