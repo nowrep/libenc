@@ -321,13 +321,15 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    sp->bs = bs;
    sp->bs->TimeStamp = surface->Data.TimeStamp;
    sp->bs->DecodeTimeStamp = surface->Data.TimeStamp;
+   sp->bs->PicStruct = MFX_PICSTRUCT_PROGRESSIVE;
+   sp->bs->DataFlag = MFX_BITSTREAM_COMPLETE_FRAME;
 
    switch (fb.frame_type) {
    case ENC_FRAME_TYPE_I:
       sp->bs->FrameType = MFX_FRAMETYPE_I;
       break;
    case ENC_FRAME_TYPE_IDR:
-      sp->bs->FrameType = MFX_FRAMETYPE_IDR;
+      sp->bs->FrameType = MFX_FRAMETYPE_I | MFX_FRAMETYPE_IDR;
       break;
    case ENC_FRAME_TYPE_P:
       sp->bs->FrameType = MFX_FRAMETYPE_P;
@@ -335,6 +337,9 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    default:
       break;
    }
+
+   if (fb.referenced)
+      sp->bs->FrameType |= MFX_FRAMETYPE_REF;
 
    *syncp = reinterpret_cast<mfxSyncPoint>(sp);
 
