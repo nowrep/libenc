@@ -236,6 +236,7 @@ mfxStatus Session::Close()
 {
    if (alloc && alloc->Free(alloc->pthis, &alloc_response) != MFX_ERR_NONE)
       return MFX_ERR_MEMORY_ALLOC;
+   alloc = nullptr;
    enc = {};
    return MFX_ERR_NONE;
 }
@@ -245,7 +246,7 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    if (!surface)
       return MFX_ERR_MORE_DATA;
 
-   mfxFrameSurface1 *surf = nullptr;
+   mfxFrameSurface1 *surf = surface;
 
    if (!alloc) {
       if (surface->Data.Y) {
@@ -271,10 +272,16 @@ mfxStatus Session::EncodeFrameAsync(mfxEncodeCtrl *ctrl, mfxFrameSurface1 *surfa
    struct enc_surface surf_in = {};
    surf_in.surface_id = VA_INVALID_SURFACE;
 
-   if (alloc)
-      alloc->GetHDL(alloc->pthis, surf->Data.MemId, reinterpret_cast<mfxHDL *>(&surf_in.surface_id));
-   else if (surf->FrameInterface)
+   if (alloc) {
+      mfxHDLPair pair = {};
+      if (alloc->GetHDL(alloc->pthis, surf->Data.MemId, reinterpret_cast<mfxHDL *>(&pair)) == MFX_ERR_NONE) {
+         VASurfaceID *id = reinterpret_cast<VASurfaceID *>(pair.first);
+         if (id)
+            surf_in.surface_id = *id;
+      }
+   } else if (surf->FrameInterface) {
       surf->FrameInterface->GetNativeHandle(surf, reinterpret_cast<mfxHDL *>(&surf_in.surface_id), nullptr);
+   }
 
    if (surf_in.surface_id == VA_INVALID_SURFACE)
       return MFX_ERR_DEVICE_LOST;
