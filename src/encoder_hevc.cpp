@@ -208,7 +208,7 @@ struct enc_task *encoder_hevc::encode_frame(const struct enc_frame_params *param
          slice.used_by_curr_pic_lt_flag[i] = ltr_poc == dpb[enc_params.ref_l0_slot].pic_order_cnt;
          slice.delta_poc_msb_present_flag[i] = 1;
          slice.delta_poc_msb_cycle_lt[i] = (poc - ltr_msb) / max_poc;
-         poc = ltr_poc;
+         poc = ltr_msb;
       }
       slice.num_long_term_pics = ltr_list.size();
    }
